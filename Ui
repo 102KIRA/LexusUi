@@ -43,11 +43,12 @@ end
 
 --// Custom UI Setup
 local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "UpdatedUI"
+ScreenGui.Name = "FinalUI"
 ScreenGui.Parent = game.CoreGui
 
 local StoredInfo = {
-    Tabs = {}
+    Tabs = {},
+    Sections = {}
 }
 
 local Library = {}
@@ -329,12 +330,64 @@ function Library:CreateWindow(Settings: { Title: string, Size: UDim2 })
         end
     end
 
-    function Options:AddButton(Settings: { Title: string, Description: string, Tab: Instance }) 
+    function Options:AddSection(Settings: { Title: string, Tab: Instance })
+        local Section = Instance.new("Frame")
+        Section.Name = Settings.Title
+        Section.Size = UDim2.new(1, -10, 0, 30)
+        Section.BackgroundColor3 = Theme.Component
+        Section.BackgroundTransparency = 0
+        Section.Parent = Settings.Tab or MainHolder:GetChildren()[1]
+
+        local SectionCorner = Instance.new("UICorner")
+        SectionCorner.CornerRadius = UDim.new(0, 5)
+        SectionCorner.Parent = Section
+
+        local SectionTitle = Instance.new("TextLabel")
+        SectionTitle.Size = UDim2.new(1, 0, 1, 0)
+        SectionTitle.BackgroundTransparency = 1
+        SectionTitle.Text = Settings.Title
+        SectionTitle.TextColor3 = Theme.Title
+        SectionTitle.TextSize = 16
+        SectionTitle.Font = Enum.Font.SourceSansBold
+        SectionTitle.TextXAlignment = Enum.TextXAlignment.Left
+        SectionTitle.Parent = Section
+
+        local SectionContent = Instance.new("Frame")
+        SectionContent.Name = "Content"
+        SectionContent.Size = UDim2.new(1, 0, 0, 0)
+        SectionContent.BackgroundTransparency = 1
+        SectionContent.AutomaticSize = Enum.AutomaticSize.Y
+        SectionContent.Parent = Settings.Tab or MainHolder:GetChildren()[1]
+
+        local SectionContentLayout = Instance.new("UIListLayout")
+        SectionContentLayout.SortOrder = Enum.SortOrder.LayoutOrder
+        SectionContentLayout.Padding = UDim.new(0, 5)
+        SectionContentLayout.Parent = SectionContent
+
+        StoredInfo.Sections[Settings.Title] = SectionContent
+
+        return SectionContent
+    end
+
+    function Options:AddLabel(Settings: { Text: string, Tab: Instance, Section: Instance })
+        local Label = Instance.new("TextLabel")
+        Label.Size = UDim2.new(1, -10, 0, 20)
+        Label.BackgroundTransparency = 1
+        Label.Text = Settings.Text
+        Label.TextColor3 = Theme.Description
+        Label.TextSize = 14
+        Label.Font = Enum.Font.SourceSans
+        Label.TextXAlignment = Enum.TextXAlignment.Left
+        Label.TextWrapped = true
+        Label.Parent = Settings.Section or Settings.Tab or MainHolder:GetChildren()[1]
+    end
+
+    function Options:AddButton(Settings: { Title: string, Description: string, Tab: Instance, Section: Instance }) 
         local Paragraph = Instance.new("Frame")
         Paragraph.Size = UDim2.new(1, -10, 0, 50)
         Paragraph.BackgroundColor3 = Theme.Component
         Paragraph.BackgroundTransparency = 0
-        Paragraph.Parent = Settings.Tab or MainHolder:GetChildren()[1]
+        Paragraph.Parent = Settings.Section or Settings.Tab or MainHolder:GetChildren()[1]
 
         local ParagraphCorner = Instance.new("UICorner")
         ParagraphCorner.CornerRadius = UDim.new(0, 5)
@@ -350,7 +403,7 @@ function Library:CreateWindow(Settings: { Title: string, Size: UDim2 })
         Title.Name = "Title"
         Title.Size = UDim2.new(1, 0, 0, 20)
         Title.BackgroundTransparency = 1
-        Title.Text = Settings.Title
+        Title.Text = "→ " .. Settings.Title -- Arrow prefix
         Title.TextColor3 = Theme.Title
         Title.TextSize = 16
         Title.Font = Enum.Font.SourceSansBold
@@ -371,13 +424,13 @@ function Library:CreateWindow(Settings: { Title: string, Size: UDim2 })
         Description.Parent = Labels
     end
 
-    function Options:AddToggle(Settings: { Title: string, Description: string, Default: boolean, Callback: any, Tab: Instance }) 
+    function Options:AddToggle(Settings: { Title: string, Description: string, Default: boolean, Callback: any, Tab: Instance, Section: Instance }) 
         local Toggle = Instance.new("TextButton")
         Toggle.Size = UDim2.new(1, -10, 0, 50)
         Toggle.BackgroundColor3 = Theme.Component
         Toggle.BackgroundTransparency = 0
         Toggle.Text = ""
-        Toggle.Parent = Settings.Tab or MainHolder:GetChildren()[1]
+        Toggle.Parent = Settings.Section or Settings.Tab or MainHolder:GetChildren()[1]
 
         local ToggleCorner = Instance.new("UICorner")
         ToggleCorner.CornerRadius = UDim.new(0, 5)
@@ -433,7 +486,7 @@ function Library:CreateWindow(Settings: { Title: string, Size: UDim2 })
         ToggleText.Name = "ToggleText"
         ToggleText.Size = UDim2.new(1, 0, 1, 0)
         ToggleText.BackgroundTransparency = 1
-        ToggleText.Text = Settings.Default and "=0" or "0"
+        ToggleText.Text = Settings.Default and "=ｏ" or "ｏ="
         ToggleText.TextColor3 = Color3.fromRGB(255, 255, 255)
         ToggleText.TextSize = 12
         ToggleText.Font = Enum.Font.SourceSans
@@ -441,7 +494,7 @@ function Library:CreateWindow(Settings: { Title: string, Size: UDim2 })
         ToggleText.Parent = Main
 
         local Set = function(Value)
-            ToggleText.Text = Value and "=0" or "0"
+            ToggleText.Text = Value and "=ｏ" or "ｏ="
             On.Value = Value
         end 
 
@@ -452,6 +505,100 @@ function Library:CreateWindow(Settings: { Title: string, Size: UDim2 })
         end)
 
         Set(Settings.Default)
+    end
+
+    function Options:AddDropdown(Settings: { Title: string, Options: {string}, Default: string, Callback: any, Tab: Instance, Section: Instance })
+        local Dropdown = Instance.new("TextButton")
+        Dropdown.Size = UDim2.new(1, -10, 0, 30)
+        Dropdown.BackgroundColor3 = Theme.Component
+        Dropdown.BackgroundTransparency = 0
+        Dropdown.Text = ""
+        Dropdown.Parent = Settings.Section or Settings.Tab or MainHolder:GetChildren()[1]
+
+        local DropdownCorner = Instance.new("UICorner")
+        DropdownCorner.CornerRadius = UDim.new(0, 5)
+        DropdownCorner.Parent = Dropdown
+
+        local DropdownTitle = Instance.new("TextLabel")
+        DropdownTitle.Size = UDim2.new(1, -40, 1, 0)
+        DropdownTitle.BackgroundTransparency = 1
+        DropdownTitle.Text = Settings.Title .. ": " .. Settings.Default
+        DropdownTitle.TextColor3 = Theme.Title
+        DropdownTitle.TextSize = 16
+        DropdownTitle.Font = Enum.Font.SourceSans
+        DropdownTitle.TextXAlignment = Enum.TextXAlignment.Left
+        DropdownTitle.Parent = Dropdown
+
+        local DropdownIcon = Instance.new("TextLabel")
+        DropdownIcon.Size = UDim2.new(0, 30, 1, 0)
+        DropdownIcon.Position = UDim2.new(1, -30, 0, 0)
+        DropdownIcon.BackgroundTransparency = 1
+        DropdownIcon.Text = "(__)"
+        DropdownIcon.TextColor3 = Theme.Title
+        DropdownIcon.TextSize = 16
+        DropdownIcon.Font = Enum.Font.SourceSans
+        DropdownIcon.TextXAlignment = Enum.TextXAlignment.Center
+        DropdownIcon.Parent = Dropdown
+
+        local DropdownList = Instance.new("Frame")
+        DropdownList.Size = UDim2.new(1, 0, 0, 0)
+        DropdownList.Position = UDim2.new(0, 0, 1, 5)
+        DropdownList.BackgroundColor3 = Theme.Component
+        DropdownList.BackgroundTransparency = 0
+        DropdownList.Visible = false
+        DropdownList.Parent = Dropdown
+
+        local DropdownListCorner = Instance.new("UICorner")
+        DropdownListCorner.CornerRadius = UDim.new(0, 5)
+        DropdownListCorner.Parent = DropdownList
+
+        local DropdownListLayout = Instance.new("UIListLayout")
+        DropdownListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+        DropdownListLayout.Padding = UDim.new(0, 2)
+        DropdownListLayout.Parent = DropdownList
+
+        local DropdownListPadding = Instance.new("UIPadding")
+        DropdownListPadding.PaddingTop = UDim.new(0, 2)
+        DropdownListPadding.PaddingBottom = UDim.new(0, 2)
+        DropdownListPadding.PaddingLeft = UDim.new(0, 2)
+        DropdownListPadding.PaddingRight = UDim.new(0, 2)
+        DropdownListPadding.Parent = DropdownList
+
+        local IsOpen = false
+
+        for _, Option in pairs(Settings.Options) do
+            local OptionButton = Instance.new("TextButton")
+            OptionButton.Size = UDim2.new(1, 0, 0, 20)
+            OptionButton.BackgroundColor3 = Theme.Interactables
+            OptionButton.Text = Option
+            OptionButton.TextColor3 = Theme.Title
+            OptionButton.TextSize = 14
+            OptionButton.Font = Enum.Font.SourceSans
+            OptionButton.TextXAlignment = Enum.TextXAlignment.Left
+            OptionButton.Parent = DropdownList
+
+            local OptionCorner = Instance.new("UICorner")
+            OptionCorner.CornerRadius = UDim.new(0, 5)
+            OptionCorner.Parent = OptionButton
+
+            OptionButton.MouseButton1Click:Connect(function()
+                DropdownTitle.Text = Settings.Title .. ": " .. Option
+                Settings.Callback(Option)
+                IsOpen = false
+                DropdownList.Visible = false
+                DropdownList.Size = UDim2.new(1, 0, 0, 0)
+            end)
+        end
+
+        Dropdown.MouseButton1Click:Connect(function()
+            IsOpen = not IsOpen
+            DropdownList.Visible = IsOpen
+            if IsOpen then
+                DropdownList.Size = UDim2.new(1, 0, 0, #Settings.Options * 22 + 4)
+            else
+                DropdownList.Size = UDim2.new(1, 0, 0, 0)
+            end
+        end)
     end
 
     function Options:addIcon(DecalId: string)
