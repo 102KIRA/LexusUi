@@ -43,7 +43,7 @@ end
 
 --// Custom UI Setup
 local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "FinalUI"
+ScreenGui.Name = "RefinedUI"
 ScreenGui.Parent = game.CoreGui
 
 local StoredInfo = {
@@ -508,26 +508,42 @@ function Library:CreateWindow(Settings: { Title: string, Size: UDim2 })
     end
 
     function Options:AddDropdown(Settings: { Title: string, Options: {string}, Default: string, Callback: any, Tab: Instance, Section: Instance })
-        local Dropdown = Instance.new("TextButton")
+        local Dropdown = Instance.new("Frame")
         Dropdown.Size = UDim2.new(1, -10, 0, 30)
         Dropdown.BackgroundColor3 = Theme.Component
         Dropdown.BackgroundTransparency = 0
-        Dropdown.Text = ""
         Dropdown.Parent = Settings.Section or Settings.Tab or MainHolder:GetChildren()[1]
 
         local DropdownCorner = Instance.new("UICorner")
         DropdownCorner.CornerRadius = UDim.new(0, 5)
         DropdownCorner.Parent = Dropdown
 
+        local DropdownButton = Instance.new("TextButton")
+        DropdownButton.Size = UDim2.new(1, 0, 1, 0)
+        DropdownButton.BackgroundTransparency = 1
+        DropdownButton.Text = ""
+        DropdownButton.Parent = Dropdown
+
         local DropdownTitle = Instance.new("TextLabel")
         DropdownTitle.Size = UDim2.new(1, -40, 1, 0)
         DropdownTitle.BackgroundTransparency = 1
-        DropdownTitle.Text = Settings.Title .. ": " .. Settings.Default
+        DropdownTitle.Text = Settings.Title
         DropdownTitle.TextColor3 = Theme.Title
         DropdownTitle.TextSize = 16
-        DropdownTitle.Font = Enum.Font.SourceSans
+        DropdownTitle.Font = Enum.Font.SourceSansBold
         DropdownTitle.TextXAlignment = Enum.TextXAlignment.Left
-        DropdownTitle.Parent = Dropdown
+        DropdownTitle.Parent = DropdownButton
+
+        local DropdownSelected = Instance.new("TextLabel")
+        DropdownSelected.Size = UDim2.new(0, 100, 1, 0)
+        DropdownSelected.Position = UDim2.new(0, 100, 0, 0)
+        DropdownSelected.BackgroundTransparency = 1
+        DropdownSelected.Text = Settings.Default
+        DropdownSelected.TextColor3 = Theme.Description
+        DropdownSelected.TextSize = 14
+        DropdownSelected.Font = Enum.Font.SourceSans
+        DropdownSelected.TextXAlignment = Enum.TextXAlignment.Left
+        DropdownSelected.Parent = DropdownButton
 
         local DropdownIcon = Instance.new("TextLabel")
         DropdownIcon.Size = UDim2.new(0, 30, 1, 0)
@@ -538,7 +554,7 @@ function Library:CreateWindow(Settings: { Title: string, Size: UDim2 })
         DropdownIcon.TextSize = 16
         DropdownIcon.Font = Enum.Font.SourceSans
         DropdownIcon.TextXAlignment = Enum.TextXAlignment.Center
-        DropdownIcon.Parent = Dropdown
+        DropdownIcon.Parent = DropdownButton
 
         local DropdownList = Instance.new("Frame")
         DropdownList.Size = UDim2.new(1, 0, 0, 0)
@@ -582,7 +598,7 @@ function Library:CreateWindow(Settings: { Title: string, Size: UDim2 })
             OptionCorner.Parent = OptionButton
 
             OptionButton.MouseButton1Click:Connect(function()
-                DropdownTitle.Text = Settings.Title .. ": " .. Option
+                DropdownSelected.Text = Option
                 Settings.Callback(Option)
                 IsOpen = false
                 DropdownList.Visible = false
@@ -590,13 +606,15 @@ function Library:CreateWindow(Settings: { Title: string, Size: UDim2 })
             end)
         end
 
-        Dropdown.MouseButton1Click:Connect(function()
+        DropdownButton.MouseButton1Click:Connect(function()
             IsOpen = not IsOpen
             DropdownList.Visible = IsOpen
             if IsOpen then
                 DropdownList.Size = UDim2.new(1, 0, 0, #Settings.Options * 22 + 4)
+                DropdownIcon.Text = "(^^)"
             else
                 DropdownList.Size = UDim2.new(1, 0, 0, 0)
+                DropdownIcon.Text = "(__)"
             end
         end)
     end
