@@ -21,6 +21,7 @@ local Theme = {
     Interactables = Color3.fromRGB(45, 45, 45),
     Title = Color3.fromRGB(240, 240, 240),
     Description = Color3.fromRGB(200, 200, 200),
+    ControlButton = Color3.fromRGB(200, 200, 200), -- Neutral color for control buttons
 }
 
 --// Services
@@ -42,7 +43,7 @@ end
 
 --// Custom UI Setup
 local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "CircularComponentUI"
+ScreenGui.Name = "UpdatedUI"
 ScreenGui.Parent = game.CoreGui
 
 local StoredInfo = {
@@ -58,7 +59,7 @@ function Library:CreateWindow(Settings: { Title: string, Size: UDim2 })
     Window.Size = Settings.Size or Setup.Size
     Window.Position = UDim2.new(0.5, -Window.Size.X.Offset / 2, 0.5, -Window.Size.Y.Offset / 2)
     Window.BackgroundColor3 = Theme.Primary
-    Window.BackgroundTransparency = 0.75 -- 75% transparency
+    Window.BackgroundTransparency = 0 -- No transparency
     Window.BorderSizePixel = 0
     Window.Parent = ScreenGui
 
@@ -71,7 +72,7 @@ function Library:CreateWindow(Settings: { Title: string, Size: UDim2 })
     Sidebar.Name = "Sidebar"
     Sidebar.Size = UDim2.new(0, 150, 1, 0)
     Sidebar.BackgroundColor3 = Theme.Primary
-    Sidebar.BackgroundTransparency = 0.75
+    Sidebar.BackgroundTransparency = 0
     Sidebar.BorderSizePixel = 0
     Sidebar.Parent = Window
 
@@ -84,7 +85,7 @@ function Library:CreateWindow(Settings: { Title: string, Size: UDim2 })
     SidebarTop.Name = "Top"
     SidebarTop.Size = UDim2.new(1, 0, 0, 30)
     SidebarTop.BackgroundColor3 = Theme.Secondary
-    SidebarTop.BackgroundTransparency = 0.75
+    SidebarTop.BackgroundTransparency = 0
     SidebarTop.BorderSizePixel = 0
     SidebarTop.Parent = Sidebar
 
@@ -140,7 +141,7 @@ function Library:CreateWindow(Settings: { Title: string, Size: UDim2 })
     MainHolder.Size = UDim2.new(1, -150, 1, 0)
     MainHolder.Position = UDim2.new(0, 150, 0, 0)
     MainHolder.BackgroundColor3 = Theme.Primary
-    MainHolder.BackgroundTransparency = 0.75
+    MainHolder.BackgroundTransparency = 0
     MainHolder.BorderSizePixel = 0
     MainHolder.Parent = Window
 
@@ -152,29 +153,29 @@ function Library:CreateWindow(Settings: { Title: string, Size: UDim2 })
     local Opened = true
     local Maximized = false
 
-    -- Create Control Buttons (Rectangular with rounded corners)
-    local function CreateControlButton(Name, Text, Color)
+    -- Create Control Buttons (Neutral color, rounded corners)
+    local function CreateControlButton(Name, Text)
         local Button = Instance.new("TextButton")
         Button.Name = Name
         Button.Size = UDim2.new(0, 20, 0, 20)
-        Button.BackgroundColor3 = Color
+        Button.BackgroundColor3 = Theme.ControlButton -- Neutral color
         Button.Text = Text
-        Button.TextColor3 = Color3.fromRGB(255, 255, 255)
+        Button.TextColor3 = Color3.fromRGB(0, 0, 0) -- Black text for contrast
         Button.TextSize = 14
         Button.Font = Enum.Font.SourceSansBold
         Button.BorderSizePixel = 0
         Button.Parent = ButtonsFrame
 
         local ButtonCorner = Instance.new("UICorner")
-        ButtonCorner.CornerRadius = UDim.new(0, 5) -- Rounded corners, not fully circular
+        ButtonCorner.CornerRadius = UDim.new(0, 5)
         ButtonCorner.Parent = Button
 
         return Button
     end
 
-    local MinimizeButton = CreateControlButton("Minimize", "-", Color3.fromRGB(0, 255, 0)) -- Green
-    local MaximizeButton = CreateControlButton("Maximize", "□", Color3.fromRGB(255, 165, 0)) -- Orange
-    local CloseButton = CreateControlButton("Close", "x", Color3.fromRGB(255, 0, 0)) -- Red
+    local MinimizeButton = CreateControlButton("Minimize", "-")
+    local MaximizeButton = CreateControlButton("Maximize", "□")
+    local CloseButton = CreateControlButton("Close", "x")
 
     -- Control Button Handlers
     for Index, Button in next, ButtonsFrame:GetChildren() do
@@ -246,7 +247,7 @@ function Library:CreateWindow(Settings: { Title: string, Size: UDim2 })
         TabButton.Name = Settings.Title
         TabButton.Size = UDim2.new(1, -10, 0, 30)
         TabButton.BackgroundColor3 = Theme.Component
-        TabButton.BackgroundTransparency = 0.75
+        TabButton.BackgroundTransparency = 0
         TabButton.Text = ""
         TabButton.LayoutOrder = #StoredInfo.Tabs + 1
         TabButton.Parent = TabContainer
@@ -328,21 +329,20 @@ function Library:CreateWindow(Settings: { Title: string, Size: UDim2 })
         end
     end
 
-    function Options:AddButton(Settings: { Title: string, Description: string }) 
+    function Options:AddButton(Settings: { Title: string, Description: string, Tab: Instance }) 
         local Paragraph = Instance.new("Frame")
-        Paragraph.Size = UDim2.new(0, 50, 0, 50) -- Circular size
+        Paragraph.Size = UDim2.new(1, -10, 0, 50)
         Paragraph.BackgroundColor3 = Theme.Component
-        Paragraph.BackgroundTransparency = 0.75
+        Paragraph.BackgroundTransparency = 0
         Paragraph.Parent = Settings.Tab or MainHolder:GetChildren()[1]
 
         local ParagraphCorner = Instance.new("UICorner")
-        ParagraphCorner.CornerRadius = UDim.new(0.5, 0) -- Makes it circular
+        ParagraphCorner.CornerRadius = UDim.new(0, 5)
         ParagraphCorner.Parent = Paragraph
 
         local Labels = Instance.new("Frame")
         Labels.Name = "Labels"
-        Labels.Size = UDim2.new(1, -10, 1, -10)
-        Labels.Position = UDim2.new(0, 5, 0, 5)
+        Labels.Size = UDim2.new(1, 0, 1, 0)
         Labels.BackgroundTransparency = 1
         Labels.Parent = Paragraph
 
@@ -352,9 +352,9 @@ function Library:CreateWindow(Settings: { Title: string, Size: UDim2 })
         Title.BackgroundTransparency = 1
         Title.Text = Settings.Title
         Title.TextColor3 = Theme.Title
-        Title.TextSize = 12 -- Reduced size for circular fit
+        Title.TextSize = 16
         Title.Font = Enum.Font.SourceSansBold
-        Title.TextXAlignment = Enum.TextXAlignment.Center
+        Title.TextXAlignment = Enum.TextXAlignment.Left
         Title.Parent = Labels
 
         local Description = Instance.new("TextLabel")
@@ -364,29 +364,28 @@ function Library:CreateWindow(Settings: { Title: string, Size: UDim2 })
         Description.BackgroundTransparency = 1
         Description.Text = Settings.Description
         Description.TextColor3 = Theme.Description
-        Description.TextSize = 10 -- Reduced size for circular fit
+        Description.TextSize = 14
         Description.Font = Enum.Font.SourceSans
-        Description.TextXAlignment = Enum.TextXAlignment.Center
+        Description.TextXAlignment = Enum.TextXAlignment.Left
         Description.TextWrapped = true
         Description.Parent = Labels
     end
 
     function Options:AddToggle(Settings: { Title: string, Description: string, Default: boolean, Callback: any, Tab: Instance }) 
         local Toggle = Instance.new("TextButton")
-        Toggle.Size = UDim2.new(0, 50, 0, 50) -- Circular size
+        Toggle.Size = UDim2.new(1, -10, 0, 50)
         Toggle.BackgroundColor3 = Theme.Component
-        Toggle.BackgroundTransparency = 0.75
+        Toggle.BackgroundTransparency = 0
         Toggle.Text = ""
         Toggle.Parent = Settings.Tab or MainHolder:GetChildren()[1]
 
         local ToggleCorner = Instance.new("UICorner")
-        ToggleCorner.CornerRadius = UDim.new(0.5, 0) -- Makes it circular
+        ToggleCorner.CornerRadius = UDim.new(0, 5)
         ToggleCorner.Parent = Toggle
 
         local Labels = Instance.new("Frame")
         Labels.Name = "Labels"
-        Labels.Size = UDim2.new(1, -10, 1, -10)
-        Labels.Position = UDim2.new(0, 5, 0, 5)
+        Labels.Size = UDim2.new(1, -40, 1, 0)
         Labels.BackgroundTransparency = 1
         Labels.Parent = Toggle
 
@@ -396,9 +395,9 @@ function Library:CreateWindow(Settings: { Title: string, Size: UDim2 })
         Title.BackgroundTransparency = 1
         Title.Text = Settings.Title
         Title.TextColor3 = Theme.Title
-        Title.TextSize = 12 -- Reduced size for circular fit
+        Title.TextSize = 16
         Title.Font = Enum.Font.SourceSansBold
-        Title.TextXAlignment = Enum.TextXAlignment.Center
+        Title.TextXAlignment = Enum.TextXAlignment.Left
         Title.Parent = Labels
 
         local Description = Instance.new("TextLabel")
@@ -408,9 +407,9 @@ function Library:CreateWindow(Settings: { Title: string, Size: UDim2 })
         Description.BackgroundTransparency = 1
         Description.Text = Settings.Description
         Description.TextColor3 = Theme.Description
-        Description.TextSize = 10 -- Reduced size for circular fit
+        Description.TextSize = 14
         Description.Font = Enum.Font.SourceSans
-        Description.TextXAlignment = Enum.TextXAlignment.Center
+        Description.TextXAlignment = Enum.TextXAlignment.Left
         Description.TextWrapped = true
         Description.Parent = Labels
 
@@ -422,20 +421,27 @@ function Library:CreateWindow(Settings: { Title: string, Size: UDim2 })
         local Main = Instance.new("Frame")
         Main.Name = "Main"
         Main.Size = UDim2.new(0, 30, 0, 14)
-        Main.Position = UDim2.new(0.5, -15, 1, -19)
-        Main.BackgroundTransparency = 1
+        Main.Position = UDim2.new(1, -30, 0.5, -7)
+        Main.BackgroundColor3 = Theme.Interactables
         Main.Parent = Toggle
 
-        local ToggleImage = Instance.new("ImageLabel")
-        ToggleImage.Name = "ToggleImage"
-        ToggleImage.Size = UDim2.new(0, 30, 0, 14)
-        ToggleImage.Position = UDim2.new(0, 0, 0, 0)
-        ToggleImage.BackgroundTransparency = 1
-        ToggleImage.Image = Settings.Default and "rbxassetid://105620223191972" or "rbxassetid://105490232180240"
-        ToggleImage.Parent = Main
+        local ToggleCorner = Instance.new("UICorner")
+        ToggleCorner.CornerRadius = UDim.new(0, 5)
+        ToggleCorner.Parent = Main
+
+        local ToggleText = Instance.new("TextLabel")
+        ToggleText.Name = "ToggleText"
+        ToggleText.Size = UDim2.new(1, 0, 1, 0)
+        ToggleText.BackgroundTransparency = 1
+        ToggleText.Text = Settings.Default and "=0" or "0"
+        ToggleText.TextColor3 = Color3.fromRGB(255, 255, 255)
+        ToggleText.TextSize = 12
+        ToggleText.Font = Enum.Font.SourceSans
+        ToggleText.TextXAlignment = Enum.TextXAlignment.Center
+        ToggleText.Parent = Main
 
         local Set = function(Value)
-            ToggleImage.Image = Value and "rbxassetid://105620223191972" or "rbxassetid://105490232180240"
+            ToggleText.Text = Value and "=0" or "0"
             On.Value = Value
         end 
 
