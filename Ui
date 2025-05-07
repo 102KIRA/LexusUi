@@ -43,7 +43,7 @@ end
 
 --// Custom UI Setup
 local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "RefinedUI"
+ScreenGui.Name = "FixedUI"
 ScreenGui.Parent = game.CoreGui
 
 local StoredInfo = {
@@ -119,12 +119,15 @@ function Library:CreateWindow(Settings: { Title: string, Size: UDim2 })
     ButtonsLayout.Padding = UDim.new(0, 5)
     ButtonsLayout.Parent = ButtonsFrame
 
-    -- Tab Container (Frame for tab buttons)
-    local TabContainer = Instance.new("Frame")
+    -- Tab Container (Scrollable Frame for tab buttons)
+    local TabContainer = Instance.new("ScrollingFrame")
     TabContainer.Name = "TabContainer"
     TabContainer.Size = UDim2.new(1, 0, 1, -30)
     TabContainer.Position = UDim2.new(0, 0, 0, 30)
     TabContainer.BackgroundTransparency = 1
+    TabContainer.ScrollBarThickness = 5
+    TabContainer.ScrollBarImageColor3 = Theme.Component
+    TabContainer.CanvasSize = UDim2.new(0, 0, 0, 0) -- Will be updated dynamically
     TabContainer.Parent = Sidebar
 
     local TabLayout = Instance.new("UIListLayout")
@@ -135,6 +138,11 @@ function Library:CreateWindow(Settings: { Title: string, Size: UDim2 })
     local TabPadding = Instance.new("UIPadding")
     TabPadding.PaddingTop = UDim.new(0, 5)
     TabPadding.Parent = TabContainer
+
+    -- Update TabContainer CanvasSize dynamically
+    TabLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+        TabContainer.CanvasSize = UDim2.new(0, 0, 0, TabLayout.AbsoluteContentSize.Y + 10)
+    end)
 
     -- Main Content Area (Frame for tab content)
     local MainHolder = Instance.new("Frame")
@@ -282,16 +290,16 @@ function Library:CreateWindow(Settings: { Title: string, Size: UDim2 })
         Value.Value = false
         Value.Parent = TabButton
 
-        -- Main Content for Tab
+        -- Main Content for Tab (Scrollable)
         local TabContent = Instance.new("ScrollingFrame")
         TabContent.Name = Settings.Title
         TabContent.Size = UDim2.new(1, 0, 1, 0)
-        TabContent.BackgroundTransparency = 1
+        TabContent.BackgroundColor3 = Theme.Primary
+        TabContent.BackgroundTransparency = 0
         TabContent.Visible = false
         TabContent.ScrollBarThickness = 5
         TabContent.ScrollBarImageColor3 = Theme.Component
-        TabContent.CanvasSize = UDim2.new(0, 0, 0, 0)
-        TabContent.AutomaticCanvasSize = Enum.AutomaticSize.Y
+        TabContent.CanvasSize = UDim2.new(0, 0, 0, 0) -- Will be updated dynamically
         TabContent.Parent = MainHolder
 
         local TabContentLayout = Instance.new("UIListLayout")
@@ -304,6 +312,11 @@ function Library:CreateWindow(Settings: { Title: string, Size: UDim2 })
         TabContentPadding.PaddingLeft = UDim.new(0, 5)
         TabContentPadding.PaddingRight = UDim.new(0, 5)
         TabContentPadding.Parent = TabContent
+
+        -- Update TabContent CanvasSize dynamically
+        TabContentLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+            TabContent.CanvasSize = UDim2.new(0, 0, 0, TabContentLayout.AbsoluteContentSize.Y + 10)
+        end)
 
         StoredInfo.Tabs[Settings.Title] = { TabButton = TabButton, TabContent = TabContent }
 
@@ -425,11 +438,10 @@ function Library:CreateWindow(Settings: { Title: string, Size: UDim2 })
     end
 
     function Options:AddToggle(Settings: { Title: string, Description: string, Default: boolean, Callback: any, Tab: Instance, Section: Instance }) 
-        local Toggle = Instance.new("TextButton")
+        local Toggle = Instance.new("Frame")
         Toggle.Size = UDim2.new(1, -10, 0, 50)
         Toggle.BackgroundColor3 = Theme.Component
         Toggle.BackgroundTransparency = 0
-        Toggle.Text = ""
         Toggle.Parent = Settings.Section or Settings.Tab or MainHolder:GetChildren()[1]
 
         local ToggleCorner = Instance.new("UICorner")
@@ -471,7 +483,7 @@ function Library:CreateWindow(Settings: { Title: string, Size: UDim2 })
         On.Value = Settings.Default
         On.Parent = Toggle
 
-        local Main = Instance.new("Frame")
+        local Main = Instance.new("TextButton")
         Main.Name = "Main"
         Main.Size = UDim2.new(0, 30, 0, 14)
         Main.Position = UDim2.new(1, -30, 0.5, -7)
@@ -498,7 +510,7 @@ function Library:CreateWindow(Settings: { Title: string, Size: UDim2 })
             On.Value = Value
         end 
 
-        Connect(Toggle.MouseButton1Click, function()
+        Connect(Main.MouseButton1Click, function()
             local Value = not On.Value
             Set(Value)
             Settings.Callback(Value)
@@ -510,13 +522,8 @@ function Library:CreateWindow(Settings: { Title: string, Size: UDim2 })
     function Options:AddDropdown(Settings: { Title: string, Options: {string}, Default: string, Callback: any, Tab: Instance, Section: Instance })
         local Dropdown = Instance.new("Frame")
         Dropdown.Size = UDim2.new(1, -10, 0, 30)
-        Dropdown.BackgroundColor3 = Theme.Component
-        Dropdown.BackgroundTransparency = 0
+        Dropdown.BackgroundTransparency = 1 -- Transparent
         Dropdown.Parent = Settings.Section or Settings.Tab or MainHolder:GetChildren()[1]
-
-        local DropdownCorner = Instance.new("UICorner")
-        DropdownCorner.CornerRadius = UDim.new(0, 5)
-        DropdownCorner.Parent = Dropdown
 
         local DropdownButton = Instance.new("TextButton")
         DropdownButton.Size = UDim2.new(1, 0, 1, 0)
@@ -525,7 +532,7 @@ function Library:CreateWindow(Settings: { Title: string, Size: UDim2 })
         DropdownButton.Parent = Dropdown
 
         local DropdownTitle = Instance.new("TextLabel")
-        DropdownTitle.Size = UDim2.new(1, -40, 1, 0)
+        DropdownTitle.Size = UDim2.new(0, 100, 1, 0)
         DropdownTitle.BackgroundTransparency = 1
         DropdownTitle.Text = Settings.Title
         DropdownTitle.TextColor3 = Theme.Title
@@ -539,7 +546,7 @@ function Library:CreateWindow(Settings: { Title: string, Size: UDim2 })
         DropdownSelected.Position = UDim2.new(0, 100, 0, 0)
         DropdownSelected.BackgroundTransparency = 1
         DropdownSelected.Text = Settings.Default
-        DropdownSelected.TextColor3 = Theme.Description
+        DropdownSelected.TextColor3 = Theme.Title -- Changed to match Title for better visibility
         DropdownSelected.TextSize = 14
         DropdownSelected.Font = Enum.Font.SourceSans
         DropdownSelected.TextXAlignment = Enum.TextXAlignment.Left
