@@ -1,636 +1,1552 @@
---// Connections
-local GetService = game.GetService
-local Connect = game.Loaded.Connect
-local Wait = game.Loaded.Wait
+local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
 
-if (not game:IsLoaded()) then
-    local Loaded = game.Loaded
-    Loaded.Wait(Loaded)
-end
+local Creator = require("../Creator")
+local New = Creator.New
+local Tween = Creator.Tween
 
---// Important 
-local Setup = {
-    Keybind = Enum.KeyCode.LeftControl,
-    Size = UDim2.new(0, 400, 0, 300),
-}
+local Notified = false
 
-local Theme = {
-    Primary = Color3.fromRGB(30, 30, 30),
-    Secondary = Color3.fromRGB(35, 35, 35),
-    Component = Color3.fromRGB(40, 40, 40),
-    Interactables = Color3.fromRGB(45, 45, 45),
-    Title = Color3.fromRGB(240, 240, 240),
-    Description = Color3.fromRGB(200, 200, 200),
-    ControlButton = Color3.fromRGB(200, 200, 200), -- Neutral color for control buttons
-}
+return function(Config)
+    local Window = {
+        Title = Config.Title or "UI Library",
+        Author = Config.Author,
+        Icon = Config.Icon,
+        Folder = Config.Folder,
+        Background = Config.Background,
+        User = Config.User or {},
+        Size = Config.Size and UDim2.new(
+                    0, math.clamp(Config.Size.X.Offset, 480, 700),
+                    0, math.clamp(Config.Size.Y.Offset, 350, 520)) or UDim2.new(0,580,0,460),
+        ToggleKey = Config.ToggleKey or Enum.KeyCode.G,
+        Transparent = Config.Transparent or false,
+        Position = UDim2.new(
+            0.5, 0,
+            0.5, 0
+        ),
+        UICorner = 16,
+        UIPadding = 14,
+        SideBarWidth = Config.SideBarWidth or 200,
+        UIElements = {},
+        CanDropdown = true,
+        Closed = false,
+        HasOutline = Config.HasOutline or false,
+        SuperParent = Config.Parent,
+        Destroyed = false,
+        IsFullscreen = false,
+        CanResize = true,
+        IsOpenButtonEnabled = true,
+        
+        CurrentTab = nil,
+        TabModule = nil,
+        
+        TopBarButtons = {},
+    }
 
---// Services
-local LocalPlayer = GetService(game, "Players").LocalPlayer
-local Services = {
-    Input = GetService(game, "UserInputService"),
-}
-
-local Player = {
-    GUI = LocalPlayer.PlayerGui,
-}
-
-local SetProperty = function(Object: Instance, Properties: {})
-    for Index, Property in next, Properties do
-        Object[Index] = (Property)
+    if Window.Folder then
+        makefolder("WindUI/" .. Window.Folder)
     end
-    return Object
-end
+    
+    local UICorner = New("UICorner", {
+        CornerRadius = UDim.new(0, Window.UICorner)
+    })
+    local UIStroke
 
---// Custom UI Setup
-local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "FixedUI"
-ScreenGui.Parent = game.CoreGui
+    local ResizeHandle = New("Frame", {
+        Size = UDim2.new(0,32,0,32),
+        Position = UDim2.new(1,0,1,0),
+        AnchorPoint = Vector2.new(.5,.5),
+        BackgroundTransparency = 1,
+        ZIndex = 99,
+        Active = true
+    }, {
+        New("ImageLabel", {
+            Size = UDim2.new(0,48*2,0,48*2),
+            BackgroundTransparency = 1,
+            Image = "rbxassetid://120997033468887",
+            Position = UDim2.new(0.5,-16,0.5,-16),
+            AnchorPoint = Vector2.new(0.5,0.5),
+            ImageTransparency = .8,
+        })
+    })
+    local FullScreenIcon = Creator.NewRoundFrame(Window.UICorner, "Squircle", {
+        Size = UDim2.new(1,0,1,0),
+        ImageTransparency = 1,
+        ImageColor3 = Color3.new(0,0,0),
+        ZIndex = 98,
+        Active = false,
+    }, {
+        New("ImageLabel", {
+            Size = UDim2.new(0,70,0,70),
+            Image = Creator.Icon("expand")[1],
+            ImageRectOffset = Creator.Icon("expand")[2].ImageRectPosition,
+            ImageRectSize = Creator.Icon("expand")[2].ImageRectSize,
+            BackgroundTransparency = 1,
+            Position = UDim2.new(0.5,0,0.5,0),
+            AnchorPoint = Vector2.new(0.5,0.5),
+            ImageTransparency = 1,
+        }),
+    })
 
-local StoredInfo = {
-    Tabs = {},
-    Sections = {}
-}
+    local FullScreenBlur = Creator.NewRoundFrame(Window.UICorner, "Squircle", {
+        Size = UDim2.new(1,0,1,0),
+        ImageTransparency = 1,
+        ImageColor3 = Color3.new(0,0,0),
+        ZIndex = 999,
+        Active = false,
+    })
 
-local Library = {}
+    local TabHighlight = Creator.NewRoundFrame(Window.UICorner-(Window.UIPadding/2), "Squircle", {
+        Size = UDim2.new(1,0,0,0),
+        ImageTransparency = .95,
+        ThemeTag = {
+            ImageColor3 = "Text",
+        }
+    })
 
-function Library:CreateWindow(Settings: { Title: string, Size: UDim2 })
-    -- Main Window (Frame)
-    local Window = Instance.new("Frame")
-    Window.Name = "Main"
-    Window.Size = Settings.Size or Setup.Size
-    Window.Position = UDim2.new(0.5, -Window.Size.X.Offset / 2, 0.5, -Window.Size.Y.Offset / 2)
-    Window.BackgroundColor3 = Theme.Primary
-    Window.BackgroundTransparency = 0 -- No transparency
-    Window.BorderSizePixel = 0
-    Window.Parent = ScreenGui
+    Window.UIElements.SideBar = New("ScrollingFrame", {
+        Size = UDim2.new(1,0,1,0),
+        BackgroundTransparency = 1,
+        ScrollBarThickness = 5,
+        ScrollBarImageColor3 = Color3.fromRGB(100, 100, 100),
+        ElasticBehavior = "Never",
+        CanvasSize = UDim2.new(0,0,0,0),
+        AutomaticCanvasSize = "None",
+        ScrollingDirection = "Y",
+        ClipsDescendants = true,
+        VerticalScrollBarPosition = "Left",
+    }, {
+        New("Frame", {
+            BackgroundTransparency = 1,
+            AutomaticSize = "Y",
+            Size = UDim2.new(1,0,0,0),
+            Name = "Frame",
+        }, {
+            New("UIPadding", {
+                PaddingTop = UDim.new(0,Window.UIPadding/2),
+                PaddingLeft = UDim.new(0,4+(Window.UIPadding/2)),
+                PaddingRight = UDim.new(0,4+(Window.UIPadding/2)),
+                PaddingBottom = UDim.new(0,Window.UIPadding/2),
+            }),
+            New("UIListLayout", {
+                SortOrder = "LayoutOrder",
+                Padding = UDim.new(0,6)
+            })
+        }),
+        New("UIPadding", {
+            PaddingLeft = UDim.new(0,Window.UIPadding/2),
+            PaddingRight = UDim.new(0,Window.UIPadding/2),
+        }),
+        TabHighlight
+    })
 
-    local WindowCorner = Instance.new("UICorner")
-    WindowCorner.CornerRadius = UDim.new(0, 10)
-    WindowCorner.Parent = Window
-
-    -- Sidebar (Frame for tabs)
-    local Sidebar = Instance.new("Frame")
-    Sidebar.Name = "Sidebar"
-    Sidebar.Size = UDim2.new(0, 150, 1, 0)
-    Sidebar.BackgroundColor3 = Theme.Primary
-    Sidebar.BackgroundTransparency = 0
-    Sidebar.BorderSizePixel = 0
-    Sidebar.Parent = Window
-
-    local SidebarCorner = Instance.new("UICorner")
-    SidebarCorner.CornerRadius = UDim.new(0, 10)
-    SidebarCorner.Parent = Sidebar
-
-    -- Sidebar Top (Frame for control buttons and icon)
-    local SidebarTop = Instance.new("Frame")
-    SidebarTop.Name = "Top"
-    SidebarTop.Size = UDim2.new(1, 0, 0, 30)
-    SidebarTop.BackgroundColor3 = Theme.Secondary
-    SidebarTop.BackgroundTransparency = 0
-    SidebarTop.BorderSizePixel = 0
-    SidebarTop.Parent = Sidebar
-
-    local SidebarTopCorner = Instance.new("UICorner")
-    SidebarTopCorner.CornerRadius = UDim.new(0, 10)
-    SidebarTopCorner.Parent = SidebarTop
-
-    -- Icon (decal for window)
-    local Icon = Instance.new("ImageLabel")
-    Icon.Name = "Icon"
-    Icon.Size = UDim2.new(0, 20, 0, 20)
-    Icon.Position = UDim2.new(0, 5, 0.5, -10)
-    Icon.BackgroundTransparency = 1
-    Icon.Image = ""
-    Icon.ImageColor3 = Theme.Title
-    Icon.Parent = SidebarTop
-
-    -- Buttons Frame (for control buttons)
-    local ButtonsFrame = Instance.new("Frame")
-    ButtonsFrame.Name = "Buttons"
-    ButtonsFrame.Size = UDim2.new(0, 90, 1, 0)
-    ButtonsFrame.Position = UDim2.new(1, -90, 0, 0)
-    ButtonsFrame.BackgroundTransparency = 1
-    ButtonsFrame.Parent = SidebarTop
-
-    local ButtonsLayout = Instance.new("UIListLayout")
-    ButtonsLayout.FillDirection = Enum.FillDirection.Horizontal
-    ButtonsLayout.HorizontalAlignment = Enum.HorizontalAlignment.Right
-    ButtonsLayout.VerticalAlignment = Enum.VerticalAlignment.Center
-    ButtonsLayout.Padding = UDim.new(0, 5)
-    ButtonsLayout.Parent = ButtonsFrame
-
-    -- Tab Container (Scrollable Frame for tab buttons)
-    local TabContainer = Instance.new("ScrollingFrame")
-    TabContainer.Name = "TabContainer"
-    TabContainer.Size = UDim2.new(1, 0, 1, -30)
-    TabContainer.Position = UDim2.new(0, 0, 0, 30)
-    TabContainer.BackgroundTransparency = 1
-    TabContainer.ScrollBarThickness = 5
-    TabContainer.ScrollBarImageColor3 = Theme.Component
-    TabContainer.CanvasSize = UDim2.new(0, 0, 0, 0) -- Will be updated dynamically
-    TabContainer.Parent = Sidebar
-
-    local TabLayout = Instance.new("UIListLayout")
-    TabLayout.SortOrder = Enum.SortOrder.LayoutOrder
-    TabLayout.Padding = UDim.new(0, 5)
-    TabLayout.Parent = TabContainer
-
-    local TabPadding = Instance.new("UIPadding")
-    TabPadding.PaddingTop = UDim.new(0, 5)
-    TabPadding.Parent = TabContainer
-
-    -- Update TabContainer CanvasSize dynamically
-    TabLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
-        TabContainer.CanvasSize = UDim2.new(0, 0, 0, TabLayout.AbsoluteContentSize.Y + 10)
+    -- Dynamically update SideBar CanvasSize
+    Window.UIElements.SideBar.Frame.UIListLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+        Window.UIElements.SideBar.CanvasSize = UDim2.new(0, 0, 0, Window.UIElements.SideBar.Frame.UIListLayout.AbsoluteContentSize.Y + 10)
     end)
 
-    -- Main Content Area (Frame for tab content)
-    local MainHolder = Instance.new("Frame")
-    MainHolder.Name = "MainHolder"
-    MainHolder.Size = UDim2.new(1, -150, 1, 0)
-    MainHolder.Position = UDim2.new(0, 150, 0, 0)
-    MainHolder.BackgroundColor3 = Theme.Primary
-    MainHolder.BackgroundTransparency = 0
-    MainHolder.BorderSizePixel = 0
-    MainHolder.Parent = Window
+    Window.UIElements.SideBarContainer = New("Frame", {
+        Size = UDim2.new(0,Window.SideBarWidth,1,Window.User.Enabled and -52 -42 -(Window.UIPadding*2) or -52 ),
+        Position = UDim2.new(0,0,0,52),
+        BackgroundTransparency = 1,
+        Visible = true,
+    }, {
+        Window.UIElements.SideBar,
+    })
 
-    local MainHolderCorner = Instance.new("UICorner")
-    MainHolderCorner.CornerRadius = UDim.new(0, 10)
-    MainHolderCorner.Parent = MainHolder
+    Window.UIElements.MainBar = New("Frame", {
+        Size = UDim2.new(1,-Window.UIElements.SideBarContainer.AbsoluteSize.X,1,-52),
+        Position = UDim2.new(1,0,1,0),
+        AnchorPoint = Vector2.new(1,1),
+        BackgroundTransparency = 1,
+    }, {
+        Creator.NewRoundFrame(Window.UICorner-(Window.UIPadding/2), "Squircle", {
+            Size = UDim2.new(1,0,1,0),
+            ImageColor3 = Color3.new(1,1,1),
+            ZIndex = 3,
+            ImageTransparency = .93,
+            Name = "Background",
+        }),
+        New("UIPadding", {
+            PaddingTop = UDim.new(0,Window.UIPadding/2),
+            PaddingLeft = UDim.new(0,Window.UIPadding/2),
+            PaddingRight = UDim.new(0,Window.UIPadding/2),
+            PaddingBottom = UDim.new(0,Window.UIPadding/2),
+        })
+    })
+    
+    local Blur = New("ImageLabel", {
+        Image = "rbxassetid://8992230677",
+        ImageColor3 = Color3.new(0,0,0),
+        ImageTransparency = 1,
+        Size = UDim2.new(1,120,1,116),
+        Position = UDim2.new(0,-120/2,0,-116/2),
+        ScaleType = "Slice",
+        SliceCenter = Rect.new(99,99,99,99),
+        BackgroundTransparency = 1,
+        ZIndex = -9999,
+    })
 
-    local Options = {}
-    local Opened = true
-    local Maximized = false
+    local IsPC
 
-    -- Create Control Buttons (Neutral color, rounded corners)
-    local function CreateControlButton(Name, Text)
-        local Button = Instance.new("TextButton")
-        Button.Name = Name
-        Button.Size = UDim2.new(0, 20, 0, 20)
-        Button.BackgroundColor3 = Theme.ControlButton -- Neutral color
-        Button.Text = Text
-        Button.TextColor3 = Color3.fromRGB(0, 0, 0) -- Black text for contrast
-        Button.TextSize = 14
-        Button.Font = Enum.Font.SourceSansBold
-        Button.BorderSizePixel = 0
-        Button.Parent = ButtonsFrame
+    if UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled then
+        IsPC = false
+    elseif UserInputService.KeyboardEnabled then
+        IsPC = true
+    else
+        IsPC = nil
+    end
+    
+    local OpenButtonContainer = nil
+    local OpenButton = nil
+    local OpenButtonIcon = nil
+    local Glow = nil
+    
+    if not IsPC then
+        OpenButtonIcon = New("ImageLabel", {
+            Image = "",
+            Size = UDim2.new(0,22,0,22),
+            Position = UDim2.new(0.5,0,0.5,0),
+            LayoutOrder = -1,
+            AnchorPoint = Vector2.new(0.5,0.5),
+            BackgroundTransparency = 1,
+            Name = "Icon"
+        })
+    
+        OpenButtonTitle = New("TextLabel", {
+            Text = Window.Title,
+            TextSize = 17,
+            FontFace = Font.new(Creator.Font, Enum.FontWeight.Medium),
+            BackgroundTransparency = 1,
+            AutomaticSize = "XY",
+        })
+    
+        OpenButtonDrag = New("Frame", {
+            Size = UDim2.new(0,44-8,0,44-8),
+            BackgroundTransparency = 1, 
+            Name = "Drag",
+        }, {
+            New("ImageLabel", {
+                Image = Creator.Icon("move")[1],
+                ImageRectOffset = Creator.Icon("move")[2].ImageRectPosition,
+                ImageRectSize = Creator.Icon("move")[2].ImageRectSize,
+                Size = UDim2.new(0,18,0,18),
+                BackgroundTransparency = 1,
+                Position = UDim2.new(0.5,0,0.5,0),
+                AnchorPoint = Vector2.new(0.5,0.5),
+            })
+        })
+        OpenButtonDivider = New("Frame", {
+            Size = UDim2.new(0,1,1,0),
+            Position = UDim2.new(0,20+16,0.5,0),
+            AnchorPoint = Vector2.new(0,0.5),
+            BackgroundColor3 = Color3.new(1,1,1),
+            BackgroundTransparency = .9,
+        })
+    
+        OpenButtonContainer = New("Frame", {
+            Size = UDim2.new(0,0,0,0),
+            Position = UDim2.new(0.5,0,0,6+44/2),
+            AnchorPoint = Vector2.new(0.5,0.5),
+            Parent = Config.Parent,
+            BackgroundTransparency = 1,
+            Active = true,
+            Visible = false,
+        })
+        OpenButton = New("TextButton", {
+            Size = UDim2.new(0,0,0,44),
+            AutomaticSize = "X",
+            Parent = OpenButtonContainer,
+            Active = false,
+            BackgroundTransparency = .25,
+            ZIndex = 99,
+            BackgroundColor3 = Color3.new(0,0,0),
+        }, {
+            New("UICorner", {
+                CornerRadius = UDim.new(1,0)
+            }),
+            New("UIStroke", {
+                Thickness = 1,
+                ApplyStrokeMode = "Border",
+                Color = Color3.new(1,1,1),
+                Transparency = 0,
+            }, {
+                New("UIGradient", {
+                    Color = ColorSequence.new(Color3.fromHex("40c9ff"), Color3.fromHex("e81cff"))
+                })
+            }),
+            OpenButtonDrag,
+            OpenButtonDivider,
+            
+            New("UIListLayout", {
+                Padding = UDim.new(0, 4),
+                FillDirection = "Horizontal",
+                VerticalAlignment = "Center",
+            }),
+            
+            New("TextButton",{
+                AutomaticSize = "XY",
+                Active = true,
+                BackgroundTransparency = 1,
+                Size = UDim2.new(0,0,0,44-(4*2)),
+                BackgroundColor3 = Color3.new(1,1,1),
+            }, {
+                New("UICorner", {
+                    CornerRadius = UDim.new(1,-4)
+                }),
+                OpenButtonIcon,
+                New("UIListLayout", {
+                    Padding = UDim.new(0, Window.UIPadding),
+                    FillDirection = "Horizontal",
+                    VerticalAlignment = "Center",
+                }),
+                OpenButtonTitle,
+                New("UIPadding", {
+                    PaddingLeft = UDim.new(0,8+4),
+                    PaddingRight = UDim.new(0,8+4),
+                }),
+            }),
+            New("UIPadding", {
+                PaddingLeft = UDim.new(0,4),
+                PaddingRight = UDim.new(0,4),
+            })
+        })
+        
+        local uiGradient = OpenButton and OpenButton.UIStroke.UIGradient or nil
+    
+        RunService.RenderStepped:Connect(function(deltaTime)
+            if Window.UIElements.Main and OpenButtonContainer and OpenButtonContainer.Parent ~= nil then
+                if uiGradient then
+                    uiGradient.Rotation = (uiGradient.Rotation + 1) % 360
+                end
+                if Glow and Glow.Parent ~= nil and Glow.UIGradient then
+                    Glow.UIGradient.Rotation = (Glow.UIGradient.Rotation + 1) % 360
+                end
+            end
+        end)
+        
+        OpenButton:GetPropertyChangedSignal("AbsoluteSize"):Connect(function()
+            OpenButtonContainer.Size = UDim2.new(
+                0, OpenButton.AbsoluteSize.X,
+                0, OpenButton.AbsoluteSize.Y
+            )
+        end)
+        
+        OpenButton.TextButton.MouseEnter:Connect(function()
+            Tween(OpenButton.TextButton, .1, {BackgroundTransparency = .93}):Play()
+        end)
+        OpenButton.TextButton.MouseLeave:Connect(function()
+            Tween(OpenButton.TextButton, .1, {BackgroundTransparency = 1}):Play()
+        end)
+    end
+    
+    local UserIcon
+    if Window.User.Enabled then
+        local ImageId, _ = game.Players:GetUserThumbnailAsync(
+            Window.User.Anonymous and 1 or game.Players.LocalPlayer.UserId, 
+            Enum.ThumbnailType.HeadShot, 
+            Enum.ThumbnailSize.Size420x420
+        )
+        
+        UserIcon = New("TextButton", {
+            Size = UDim2.new(0,
+                (Window.UIElements.SideBarContainer.AbsoluteSize.X)-(Window.UIPadding/2),
+                0,
+                42+(Window.UIPadding)
+            ),
+            Position = UDim2.new(0,Window.UIPadding/2,1,-(Window.UIPadding/2)),
+            AnchorPoint = Vector2.new(0,1),
+            BackgroundTransparency = 1,
+        }, {
+            Creator.NewRoundFrame(Window.UICorner-(Window.UIPadding/2), "Squircle", {
+                Size = UDim2.new(1,0,1,0),
+                ThemeTag = {
+                    ImageColor3 = "Text",
+                },
+                ImageTransparency = 1,
+                Name = "UserIcon",
+            }, {
+                New("ImageLabel", {
+                    Image = ImageId,
+                    BackgroundTransparency = 1,
+                    Size = UDim2.new(0,42,0,42),
+                    ThemeTag = {
+                        BackgroundColor3 = "Text",
+                    },
+                    BackgroundTransparency = .93,
+                }, {
+                    New("UICorner", {
+                        CornerRadius = UDim.new(1,0)
+                    })
+                }),
+                New("Frame", {
+                    AutomaticSize = "XY",
+                    BackgroundTransparency = 1,
+                }, {
+                    New("TextLabel", {
+                        Text = Window.User.Anonymous and "Anonymous" or game.Players.LocalPlayer.DisplayName,
+                        TextSize = 17,
+                        ThemeTag = {
+                            TextColor3 = "Text",
+                        },
+                        FontFace = Font.new(Creator.Font, Enum.FontWeight.SemiBold),
+                        AutomaticSize = "Y",
+                        BackgroundTransparency = 1,
+                        Size = UDim2.new(1,-(42/2)-6,0,0),
+                        TextTruncate = "AtEnd",
+                        TextXAlignment = "Left",
+                    }),
+                    New("TextLabel", {
+                        Text = Window.User.Anonymous and "@anonymous" or "@" .. game.Players.LocalPlayer.Name,
+                        TextSize = 15,
+                        TextTransparency = .6,
+                        ThemeTag = {
+                            TextColor3 = "Text",
+                        },
+                        FontFace = Font.new(Creator.Font, Enum.FontWeight.Medium),
+                        AutomaticSize = "Y",
+                        BackgroundTransparency = 1, 
+                        Size = UDim2.new(1,-(42/2)-6,0,0),
+                        TextTruncate = "AtEnd",
+                        TextXAlignment = "Left",
+                    }),
+                    New("UIListLayout", {
+                        Padding = UDim.new(0,4),
+                        HorizontalAlignment = "Left",
+                    })
+                }),
+                New("UIListLayout", {
+                    Padding = UDim.new(0,Window.UIPadding),
+                    FillDirection = "Horizontal",
+                    VerticalAlignment = "Center",
+                }),
+                New("UIPadding", {
+                    PaddingLeft = UDim.new(0,Window.UIPadding/2),
+                    PaddingRight = UDim.new(0,Window.UIPadding/2),
+                })
+            })
+        })
+        
+        if Window.User.Callback then
+            UserIcon.MouseButton1Click:Connect(function()
+                Window.User.Callback()
+            end)
+            UserIcon.MouseEnter:Connect(function()
+                Tween(UserIcon.UserIcon, 0.04, {ImageTransparency = .94}):Play()
+            end)
+            UserIcon.InputEnded:Connect(function()
+                Tween(UserIcon.UserIcon, 0.04, {ImageTransparency = 1}):Play()
+            end)
+        end
+    end
+    
+    local Outline1
+    local Outline2
+    
+    local BottomDragFrame = Creator.NewRoundFrame(99, "Squircle", {
+        ImageTransparency = .8,
+        ImageColor3 = Color3.new(1,1,1),
+        Size = UDim2.new(0,200,0,4),
+        Position = UDim2.new(0.5,0,1,4),
+        AnchorPoint = Vector2.new(0.5,0),
+    }, {
+        New("Frame", {
+            Size = UDim2.new(1,12,1,12),
+            BackgroundTransparency = 1,
+            Position = UDim2.new(0.5,0,0.5,0),
+            AnchorPoint = Vector2.new(0.5,0.5),
+            Active = true,
+            ZIndex = 99,
+        })
+    })
 
-        local ButtonCorner = Instance.new("UICorner")
-        ButtonCorner.CornerRadius = UDim.new(0, 5)
-        ButtonCorner.Parent = Button
+    local WindowTitle = New("TextLabel", {
+        Text = Window.Title,
+        FontFace = Font.new(Creator.Font, Enum.FontWeight.SemiBold),
+        BackgroundTransparency = 1,
+        AutomaticSize = "XY",
+        Name = "Title",
+        TextXAlignment = "Left",
+        TextSize = 16,
+        ThemeTag = {
+            TextColor3 = "Text"
+        }
+    })
+    
+    Window.UIElements.Main = New("Frame", {
+        Size = Window.Size,
+        Position = Window.Position,
+        BackgroundTransparency = 1,
+        Parent = Config.Parent,
+        AnchorPoint = Vector2.new(0.5,0.5),
+        Active = true,
+    }, {
+        Blur,
+        Creator.NewRoundFrame(Window.UICorner, "Squircle", {
+            ImageTransparency = 1,
+            Size = UDim2.new(1,0,1,0),
+            AnchorPoint = Vector2.new(0.5,0.5),
+            Position = UDim2.new(0.5,0,0.5,0),
+            Name = "Background",
+            ThemeTag = {
+                ImageColor3 = "Background"
+            },
+            ZIndex = -99,
+        }, {
+            New("ImageLabel", {
+                BackgroundTransparency = 1,
+                Size = UDim2.new(1,0,1,0),
+                Image = Window.Background,
+                ImageTransparency = 1,
+                ScaleType = "Crop",
+            }, {
+                New("UICorner", {
+                    CornerRadius = UDim.new(0,Window.UICorner)
+                }),
+            }),
+            New("UIScale", {
+                Scale = 0.95,
+            }),
+        }),
+        UIStroke,
+        UICorner,
+        ResizeHandle,
+        FullScreenIcon,
+        FullScreenBlur,
+        BottomDragFrame,
+        New("Frame", {
+            Size = UDim2.new(1,0,1,0),
+            BackgroundTransparency = 1,
+            Name = "Main",
+            Visible = false,
+            ZIndex = 97,
+        }, {
+            New("UICorner", {
+                CornerRadius = UDim.new(0,Window.UICorner)
+            }),
+            Window.UIElements.SideBarContainer,
+            Window.UIElements.MainBar,
+            
+            UserIcon,
+            
+            Outline2,
+            New("Frame", {
+                Size = UDim2.new(1,0,0,52),
+                BackgroundTransparency = 1,
+                BackgroundColor3 = Color3.fromRGB(50,50,50),
+                Name = "Topbar"
+            }, {
+                Outline1,
+                New("Frame", {
+                    AutomaticSize = "X",
+                    Size = UDim2.new(0,0,1,0),
+                    BackgroundTransparency = 1,
+                    Name = "Left"
+                }, {
+                    New("UIListLayout", {
+                        Padding = UDim.new(0,10),
+                        SortOrder = "LayoutOrder",
+                        FillDirection = "Horizontal",
+                        VerticalAlignment = "Center",
+                    }),
+                    New("Frame", {
+                        AutomaticSize = "XY",
+                        BackgroundTransparency = 1,
+                        Name = "Title",
+                        Size = UDim2.new(0,0,1,0),
+                        LayoutOrder= 2,
+                    }, {
+                        New("UIListLayout", {
+                            Padding = UDim.new(0,0),
+                            SortOrder = "LayoutOrder",
+                            FillDirection = "Vertical",
+                            VerticalAlignment = "Top",
+                        }),
+                        WindowTitle,
+                    }),
+                    New("UIPadding", {
+                        PaddingLeft = UDim.new(0,4)
+                    })
+                }),
+                New("Frame", {
+                    AutomaticSize = "XY",
+                    BackgroundTransparency = 1,
+                    Position = UDim2.new(1,0,0.5,0),
+                    AnchorPoint = Vector2.new(1,0.5),
+                    Name = "Right",
+                }, {
+                    New("UIListLayout", {
+                        Padding = UDim.new(0,9),
+                        FillDirection = "Horizontal",
+                        SortOrder = "LayoutOrder",
+                    }),
+                }),
+                New("UIPadding", {
+                    PaddingTop = UDim.new(0,Window.UIPadding),
+                    PaddingLeft = UDim.new(0,Window.UIPadding),
+                    PaddingRight = UDim.new(0,8),
+                    PaddingBottom = UDim.new(0,Window.UIPadding),
+                })
+            })
+        })
+    })
 
+    function Window:CreateTopbarButton(Icon, Callback, LayoutOrder)
+        local Button = New("TextButton", {
+            Size = UDim2.new(0,36,0,36),
+            BackgroundTransparency = 1,
+            LayoutOrder = LayoutOrder or 999,
+            Parent = Window.UIElements.Main.Main.Topbar.Right,
+            ZIndex = 9999,
+            ThemeTag = {
+                BackgroundColor3 = "Text"
+            },
+            BackgroundTransparency = 1
+        }, {
+            New("UICorner", {
+                CornerRadius = UDim.new(0,9),
+            }),
+            New("ImageLabel", {
+                Image = Creator.Icon(Icon)[1],
+                ImageRectOffset = Creator.Icon(Icon)[2].ImageRectPosition,
+                ImageRectSize = Creator.Icon(Icon)[2].ImageRectSize,
+                BackgroundTransparency = 1,
+                Size = UDim2.new(0,16,0,16),
+                ThemeTag = {
+                    ImageColor3 = "Text"
+                },
+                AnchorPoint = Vector2.new(0.5,0.5),
+                Position = UDim2.new(0.5,0,0.5,0),
+                Active = false,
+                ImageTransparency = .2,
+            }),
+        })
+    
+        Window.TopBarButtons[100-LayoutOrder] = Button
+        
+        Button.MouseButton1Click:Connect(function()
+            Callback()
+        end)
+        Button.MouseEnter:Connect(function()
+            Tween(Button, .15, {BackgroundTransparency = .93}):Play()
+            Tween(Button.ImageLabel, .15, {ImageTransparency = 0}):Play()
+        end)
+        Button.MouseLeave:Connect(function()
+            Tween(Button, .1, {BackgroundTransparency = 1}):Play()
+            Tween(Button.ImageLabel, .1, {ImageTransparency = .2}):Play()
+        end)
+        
         return Button
     end
 
-    local MinimizeButton = CreateControlButton("Minimize", "-")
-    local MaximizeButton = CreateControlButton("Maximize", "□")
-    local CloseButton = CreateControlButton("Close", "x")
-
-    -- Control Button Handlers
-    for Index, Button in next, ButtonsFrame:GetChildren() do
-        if Button:IsA("TextButton") then
-            local Name = Button.Name
-            Connect(Button.MouseButton1Click, function() 
-                if Name == "Close" then
-                    Window.Visible = false
-                elseif Name == "Maximize" then
-                    if Maximized then
-                        Maximized = false
-                        Window.Size = Setup.Size
-                        Window.Position = UDim2.new(0.5, -Window.Size.X.Offset / 2, 0.5, -Window.Size.Y.Offset / 2)
-                    else
-                        Maximized = true
-                        Window.Size = UDim2.fromScale(1, 1)
-                        Window.Position = UDim2.fromScale(0.5, 0.5)
-                    end
-                elseif Name == "Minimize" then
-                    Opened = false
-                    Window.Visible = false
-                end
-            end)
+    local WindowDragModule = Creator.Drag(
+        Window.UIElements.Main, 
+        {Window.UIElements.Main.Main.Topbar, BottomDragFrame.Frame}, 
+        function(dragging, frame)
+            if dragging and frame == BottomDragFrame.Frame then
+                Tween(BottomDragFrame, .1, {ImageTransparency = .35}):Play()
+            else
+                Tween(BottomDragFrame, .2, {ImageTransparency = .8}):Play()
+            end
         end
+    )
+    
+    local OpenButtonDragModule
+    
+    if not IsPC then
+        OpenButtonDragModule = Creator.Drag(OpenButtonContainer)
+    end
+    
+    if Window.Author then
+        local Author = New("TextLabel", {
+            Text = Window.Author,
+            FontFace = Font.new(Creator.Font, Enum.FontWeight.Medium),
+            BackgroundTransparency = 1,
+            TextTransparency = 0.4,
+            AutomaticSize = "XY",
+            Parent = Window.UIElements.Main.Main.Topbar.Left.Title,
+            TextXAlignment = "Left",
+            TextSize = 14,
+            LayoutOrder = 2,
+            ThemeTag = {
+                TextColor3 = "Text"
+            }
+        })
+    end
+    
+    task.spawn(function()
+        if Window.Icon then
+            local ImageFrame = Creator.Image(
+                Window.Icon,
+                Window.Title,
+                Window.UICorner-4,
+                Window.Folder,
+                "Window"
+            )
+            ImageFrame.Parent = Window.UIElements.Main.Main.Topbar.Left
+            ImageFrame.Size = UDim2.new(0,22,0,22)
+            
+            if Creator.Icon(tostring(Window.Icon))[1] then
+                OpenButtonIcon.Image = Creator.Icon(Window.Icon)[1]
+                OpenButtonIcon.ImageRectOffset = Creator.Icon(Window.Icon)[2].ImageRectPosition
+                OpenButtonIcon.ImageRectSize = Creator.Icon(Window.Icon)[2].ImageRectSize
+            end
+        else
+            OpenButtonIcon.Visible = false
+        end
+    end)
+    
+    function Window:SetToggleKey(keycode)
+        Window.ToggleKey = keycode
+    end
+    
+    function Window:SetBackgroundImage(id)
+        Window.UIElements.Main.Background.ImageLabel.Image = id
+    end
+    
+    local CurrentPos
+    local CurrentSize
+    local iconCopy = Creator.Icon("minimize")
+    local iconSquare = Creator.Icon("maximize")
+    
+    local FullscreenButton
+    
+    FullscreenButton = Window:CreateTopbarButton("maximize", function() 
+        local isFullscreen = Window.IsFullscreen
+        WindowDragModule:Set(isFullscreen)
+    
+        if not isFullscreen then
+            CurrentPos = Window.UIElements.Main.Position
+            CurrentSize = Window.UIElements.Main.Size
+            FullscreenButton.ImageLabel.Image = iconCopy[1]
+            FullscreenButton.ImageLabel.ImageRectOffset = iconCopy[2].ImageRectPosition
+            FullscreenButton.ImageLabel.ImageRectSize = iconCopy[2].ImageRectSize
+            Window.CanResize = false
+        else
+            FullscreenButton.ImageLabel.Image = iconSquare[1]
+            FullscreenButton.ImageLabel.ImageRectOffset = iconSquare[2].ImageRectPosition
+            FullscreenButton.ImageLabel.ImageRectSize = iconSquare[2].ImageRectSize
+            Window.CanResize = true
+        end
+        
+        Tween(Window.UIElements.Main, 0.45, {Size = isFullscreen and CurrentSize or UDim2.new(1,-20,1,-20-52)}, Enum.EasingStyle.Quint, Enum.EasingDirection.Out):Play()
+    
+        Tween(Window.UIElements.Main, 0.45, {Position = isFullscreen and CurrentPos or UDim2.new(0.5,0,0.5,52/2)}, Enum.EasingStyle.Quint, Enum.EasingDirection.Out):Play()
+        
+        Window.IsFullscreen = not isFullscreen
+    end, 998)
+    Window:CreateTopbarButton("minus", function() 
+        Window:Close()
+        task.spawn(function()
+            task.wait(.3)
+            if not IsPC and Window.IsOpenButtonEnabled then
+                OpenButtonContainer.Visible = true
+            end
+        end)
+        
+        local NotifiedText = IsPC and "Press " .. Window.ToggleKey.Name .. " to open the Window" or "Click the Button to open the Window"
+        
+        if not Window.IsOpenButtonEnabled then
+            Notified = true
+        end
+        if not Notified then
+            Notified = not Notified
+            Config.WindUI:Notify({
+                Title = "Minimize",
+                Content = "You've closed the Window. " .. NotifiedText,
+                Icon = "eye-off",
+                Duration = 5,
+            })
+        end
+    end, 997)
+
+    function Window:Open()
+        task.spawn(function()
+            Window.Closed = false
+            Tween(Window.UIElements.Main.Background, 0.25, {ImageTransparency = Config.Transparent and Config.WindUI.TransparencyValue or 0}, Enum.EasingStyle.Quint, Enum.EasingDirection.Out):Play()
+            Tween(Window.UIElements.Main.Background.ImageLabel, 0.2, {ImageTransparency = 0}, Enum.EasingStyle.Quint, Enum.EasingDirection.Out):Play()
+            Tween(Window.UIElements.Main.Background.UIScale, 0.2, {Scale = 1}, Enum.EasingStyle.Back, Enum.EasingDirection.Out):Play()
+            Tween(Blur, 0.25, {ImageTransparency = .7}, Enum.EasingStyle.Quint, Enum.EasingDirection.Out):Play()
+            if UIStroke then
+                Tween(UIStroke, 0.25, {Transparency = .8}, Enum.EasingStyle.Quint, Enum.EasingDirection.Out):Play()
+            end
+            
+            Window.CanDropdown = true
+            
+            Window.UIElements.Main.Visible = true
+            task.wait(.1)
+            Window.UIElements.Main.Main.Visible = true
+        end)
+    end
+    function Window:Close()
+        local Close = {}
+        
+        Window.UIElements.Main.Main.Visible = false
+        Window.CanDropdown = false
+        Window.Closed = true
+        
+        Tween(Window.UIElements.Main.Background, 0.25, {ImageTransparency = 1}, Enum.EasingStyle.Quint, Enum.EasingDirection.Out):Play()
+        Tween(Window.UIElements.Main.Background.UIScale, 0.19, {Scale = .95}, Enum.EasingStyle.Quint, Enum.EasingDirection.Out):Play()
+        Tween(Window.UIElements.Main.Background.ImageLabel, 0.2, {ImageTransparency = 1}, Enum.EasingStyle.Quint, Enum.EasingDirection.Out):Play()
+        Tween(Blur, 0.25, {ImageTransparency = 1}, Enum.EasingStyle.Quint, Enum.EasingDirection.Out):Play()
+        if UIStroke then
+            Tween(UIStroke, 0.25, {Transparency = 1}, Enum.EasingStyle.Quint, Enum.EasingDirection.Out):Play()
+        end
+        
+        task.spawn(function()
+            task.wait(0.25)
+            Window.UIElements.Main.Visible = false
+        end)
+        
+        function Close:Destroy()
+            Window.Destroyed = true
+            task.wait(0.25)
+            Config.Parent.Parent:Destroy()
+        end
+        
+        return Close
+    end
+    
+    function Window:ToggleTransparency(Value)
+        Config.Transparent = Value
+        Config.WindUI.Transparent = Value
+        Config.WindUI.Window.Transparent = Value
+        
+        Window.UIElements.Main.Background.ImageTransparency = Value and Config.WindUI.TransparencyValue or 0
+        Window.UIElements.Main.Background.ImageLabel.ImageTransparency = Value and Config.WindUI.TransparencyValue or 0
+        Window.UIElements.MainBar.Background.ImageTransparency = Value and 0.97 or 0.93
     end
 
-    -- Keybind to toggle window visibility
-    Services.Input.InputBegan:Connect(function(Input, Focused) 
-        if (Input.KeyCode == Setup.Keybind) and not Focused then
-            if Opened then
-                Opened = false
-                Window.Visible = false
+    if not IsPC and Window.IsOpenButtonEnabled then
+        OpenButton.TextButton.MouseButton1Click:Connect(function()
+            OpenButtonContainer.Visible = false
+            Window:Open()
+        end)
+    end
+    
+    UserInputService.InputBegan:Connect(function(input, isProcessed)
+        if isProcessed then return end
+        
+        if input.KeyCode == Window.ToggleKey then
+            if Window.Closed then
+                Window:Open()
             else
-                Opened = true
-                Window.Visible = true
+                Window:Close()
             end
         end
     end)
+    
+    task.spawn(function()
+        Window:Open()
+    end)
+    
+    function Window:EditOpenButton(OpenButtonConfig)
+        if OpenButton and OpenButton.Parent ~= nil then
+            local OpenButtonModule = {
+                Title = OpenButtonConfig.Title,
+                Icon = OpenButtonConfig.Icon or Window.Icon,
+                Enabled = OpenButtonConfig.Enabled,
+                Position = OpenButtonConfig.Position,
+                Draggable = OpenButtonConfig.Draggable,
+                OnlyMobile = OpenButtonConfig.OnlyMobile,
+                CornerRadius = OpenButtonConfig.CornerRadius or UDim.new(1, 0),
+                StrokeThickness = OpenButtonConfig.StrokeThickness or 2,
+                Color = OpenButtonConfig.Color 
+                    or ColorSequence.new(Color3.fromHex("40c9ff"), Color3.fromHex("e81cff")),
+            }
+            
+            if OpenButtonModule.Enabled == false then
+                Window.IsOpenButtonEnabled = false
+            end
+            if OpenButtonModule.Draggable == false and OpenButtonDrag and OpenButtonDivider then
+                OpenButtonDrag.Visible = OpenButtonModule.Draggable
+                OpenButtonDivider.Visible = OpenButtonModule.Draggable
+                
+                if OpenButtonDragModule then
+                    OpenButtonDragModule:Set(OpenButtonModule.Draggable)
+                end
+            end
+            if OpenButtonModule.Position and OpenButtonContainer then
+                OpenButtonContainer.Position = OpenButtonModule.Position
+            end
+            
+            local IsPC = UserInputService.KeyboardEnabled or not UserInputService.TouchEnabled
+            OpenButton.Visible = not OpenButtonModule.OnlyMobile or not IsPC
+            
+            if not OpenButton.Visible then return end
+            
+            if OpenButtonTitle then
+                if OpenButtonModule.Title then
+                    OpenButtonTitle.Text = OpenButtonModule.Title
+                end
+            end
+            
+            if Creator.Icon(OpenButtonModule.Icon) and OpenButtonIcon then
+                OpenButtonIcon.Visible = true
+                OpenButtonIcon.Image = Creator.Icon(OpenButtonModule.Icon)[1]
+                OpenButtonIcon.ImageRectOffset = Creator.Icon(OpenButtonModule.Icon)[2].ImageRectPosition
+                OpenButtonIcon.ImageRectSize = Creator.Icon(OpenButtonModule.Icon)[2].ImageRectSize
+            end
+    
+            OpenButton.UIStroke.UIGradient.Color = OpenButtonModule.Color
+            if Glow then
+                Glow.UIGradient.Color = OpenButtonModule.Color
+            end
+    
+            OpenButton.UICorner.CornerRadius = OpenButtonModule.CornerRadius
+            OpenButton.TextButton.UICorner.CornerRadius = UDim.new(OpenButtonModule.CornerRadius.Scale, OpenButtonModule.CornerRadius.Offset-4)
+            OpenButton.UIStroke.Thickness = OpenButtonModule.StrokeThickness
+        end
+    end
+    
+    local StoredInfo = {
+        Tabs = {},
+        Sections = {}
+    }
 
-    -- Tab Management
-    function Options:SetTab(Name: string)
-        for Index, Button in next, TabContainer:GetChildren() do
-            if Button:IsA("TextButton") then
-                local Opened, SameName = Button:FindFirstChild("Value"), (Button.Name == Name)
-                if SameName and not Opened.Value then
-                    SetProperty(Opened, { Value = true })
-                elseif not SameName and Opened.Value then
-                    SetProperty(Opened, { Value = false })
+    function Window:Tab(TabConfig)
+        if StoredInfo.Tabs[TabConfig.Title] then 
+            error("[UI LIB]: A tab with the name '" .. TabConfig.Title .. "' already exists") 
+        end 
+
+        local TabButton = New("TextButton", {
+            Size = UDim2.new(1, 0, 0, 30),
+            BackgroundTransparency = 1,
+            LayoutOrder = #StoredInfo.Tabs + 1,
+            Text = "",
+            Parent = TabConfig.Parent,
+        }, {
+            New("UICorner", {
+                CornerRadius = UDim.new(0, 5)
+            }),
+            New("TextLabel", {
+                Size = UDim2.new(1, -30, 1, 0),
+                Position = UDim2.new(0, 30, 0, 0),
+                BackgroundTransparency = 1,
+                Text = TabConfig.Title,
+                TextColor3 = Color3.fromRGB(240, 240, 240),
+                TextSize = 16,
+                FontFace = Font.new(Creator.Font, Enum.FontWeight.Medium),
+                TextXAlignment = "Left",
+            }),
+            New("ImageLabel", {
+                Name = "TabIcon",
+                Size = UDim2.new(0, 20, 0, 20),
+                Position = UDim2.new(0, 5, 0.5, -10),
+                BackgroundTransparency = 1,
+                Image = TabConfig.Icon or "",
+                ImageColor3 = Color3.fromRGB(240, 240, 240),
+            }),
+            New("BoolValue", {
+                Name = "Value",
+                Value = false,
+            })
+        })
+
+        local TabContent = New("ScrollingFrame", {
+            Name = TabConfig.Title,
+            Size = UDim2.new(1, 0, 1, 0),
+            BackgroundColor3 = Color3.fromRGB(30, 30, 30),
+            BackgroundTransparency = 0,
+            Visible = false,
+            ScrollBarThickness = 5,
+            ScrollBarImageColor3 = Color3.fromRGB(100, 100, 100),
+            CanvasSize = UDim2.new(0, 0, 0, 0),
+            Parent = Window.UIElements.MainBar,
+        }, {
+            New("UIListLayout", {
+                SortOrder = "LayoutOrder",
+                Padding = UDim.new(0, 5)
+            }),
+            New("UIPadding", {
+                PaddingTop = UDim.new(0, 5),
+                PaddingLeft = UDim.new(0, 5),
+                PaddingRight = UDim.new(0, 5),
+            })
+        })
+
+        TabContent.UIListLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+            TabContent.CanvasSize = UDim2.new(0, 0, 0, TabContent.UIListLayout.AbsoluteContentSize.Y + 10)
+        end)
+
+        StoredInfo.Tabs[TabConfig.Title] = { TabButton = TabButton, TabContent = TabContent }
+
+        local function SetTab(Name)
+            for _, tab in pairs(StoredInfo.Tabs) do
+                local isSelected = (tab.TabButton.Name == Name)
+                tab.TabButton.Value.Value = isSelected
+                tab.TabContent.Visible = isSelected
+                if isSelected then
+                    Window.CurrentTab = tab
+                    TabHighlight.Size = UDim2.new(1, 0, 0, 30)
+                    TabHighlight.Position = UDim2.new(0, 0, 0, (TabButton.LayoutOrder - 1) * (30 + 6))
                 end
             end
         end
 
-        for Index, Main in next, MainHolder:GetChildren() do
-            if Main:IsA("ScrollingFrame") then
-                local SameName = (Main.Name == Name)
-                Main.Visible = SameName
-            end
-        end
-    end
-
-    -- Component Functions
-    function Options:AddTab(Settings: { Title: string })
-        if StoredInfo.Tabs[Settings.Title] then 
-            error("[UI LIB]: A tab with the same name has already been created") 
-        end 
-
-        -- Tab Button
-        local TabButton = Instance.new("TextButton")
-        TabButton.Name = Settings.Title
-        TabButton.Size = UDim2.new(1, -10, 0, 30)
-        TabButton.BackgroundColor3 = Theme.Component
-        TabButton.BackgroundTransparency = 0
-        TabButton.Text = ""
-        TabButton.LayoutOrder = #StoredInfo.Tabs + 1
-        TabButton.Parent = TabContainer
-
-        local TabButtonCorner = Instance.new("UICorner")
-        TabButtonCorner.CornerRadius = UDim.new(0, 5)
-        TabButtonCorner.Parent = TabButton
-
-        local TabText = Instance.new("TextLabel")
-        TabText.Size = UDim2.new(1, -30, 1, 0)
-        TabText.Position = UDim2.new(0, 30, 0, 0)
-        TabText.BackgroundTransparency = 1
-        TabText.Text = Settings.Title
-        TabText.TextColor3 = Theme.Title
-        TabText.TextSize = 16
-        TabText.Font = Enum.Font.SourceSans
-        TabText.TextXAlignment = Enum.TextXAlignment.Left
-        TabText.Parent = TabButton
-
-        local TabIcon = Instance.new("ImageLabel")
-        TabIcon.Name = "TabIcon"
-        TabIcon.Size = UDim2.new(0, 20, 0, 20)
-        TabIcon.Position = UDim2.new(0, 5, 0.5, -10)
-        TabIcon.BackgroundTransparency = 1
-        TabIcon.Image = ""
-        TabIcon.ImageColor3 = Theme.Title
-        TabIcon.Parent = TabButton
-
-        local Value = Instance.new("BoolValue")
-        Value.Name = "Value"
-        Value.Value = false
-        Value.Parent = TabButton
-
-        -- Main Content for Tab (Scrollable)
-        local TabContent = Instance.new("ScrollingFrame")
-        TabContent.Name = Settings.Title
-        TabContent.Size = UDim2.new(1, 0, 1, 0)
-        TabContent.BackgroundColor3 = Theme.Primary
-        TabContent.BackgroundTransparency = 0
-        TabContent.Visible = false
-        TabContent.ScrollBarThickness = 5
-        TabContent.ScrollBarImageColor3 = Theme.Component
-        TabContent.CanvasSize = UDim2.new(0, 0, 0, 0) -- Will be updated dynamically
-        TabContent.Parent = MainHolder
-
-        local TabContentLayout = Instance.new("UIListLayout")
-        TabContentLayout.SortOrder = Enum.SortOrder.LayoutOrder
-        TabContentLayout.Padding = UDim.new(0, 5)
-        TabContentLayout.Parent = TabContent
-
-        local TabContentPadding = Instance.new("UIPadding")
-        TabContentPadding.PaddingTop = UDim.new(0, 5)
-        TabContentPadding.PaddingLeft = UDim.new(0, 5)
-        TabContentPadding.PaddingRight = UDim.new(0, 5)
-        TabContentPadding.Parent = TabContent
-
-        -- Update TabContent CanvasSize dynamically
-        TabContentLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
-            TabContent.CanvasSize = UDim2.new(0, 0, 0, TabContentLayout.AbsoluteContentSize.Y + 10)
-        end)
-
-        StoredInfo.Tabs[Settings.Title] = { TabButton = TabButton, TabContent = TabContent }
-
         TabButton.MouseButton1Click:Connect(function()
-            Options:SetTab(TabButton.Name)
+            SetTab(TabButton.Name)
         end)
 
         if #StoredInfo.Tabs == 1 then
-            Options:SetTab(Settings.Title)
+            SetTab(TabConfig.Title)
         end
 
-        return TabContent
-    end
+        local Tab = {}
 
-    function Options:AddTabIcon(TabName: string, DecalId: string)
-        if StoredInfo.Tabs[TabName] then
-            local TabButton = StoredInfo.Tabs[TabName].TabButton
-            local TabIcon = TabButton:FindFirstChild("TabIcon")
-            if TabIcon then
-                TabIcon.Image = DecalId
+        function Tab:AddSection(Settings)
+            local Section = New("Frame", {
+                Name = Settings.Title,
+                Size = UDim2.new(1, -10, 0, 30),
+                BackgroundColor3 = Color3.fromRGB(40, 40, 40),
+                BackgroundTransparency = 0,
+                Parent = TabContent,
+            }, {
+                New("UICorner", {
+                    CornerRadius = UDim.new(0, 5)
+                }),
+                New("TextLabel", {
+                    Size = UDim2.new(1, 0, 1, 0),
+                    BackgroundTransparency = 1,
+                    Text = Settings.Title,
+                    TextColor3 = Color3.fromRGB(240, 240, 240),
+                    TextSize = 16,
+                    FontFace = Font.new(Creator.Font, Enum.FontWeight.SemiBold),
+                    TextXAlignment = "Left",
+                })
+            })
+
+            local SectionContent = New("Frame", {
+                Name = "Content",
+                Size = UDim2.new(1, 0, 0, 0),
+                BackgroundTransparency = 1,
+                AutomaticSize = "Y",
+                Parent = TabContent,
+            }, {
+                New("UIListLayout", {
+                    SortOrder = "LayoutOrder",
+                    Padding = UDim.new(0, 5)
+                })
+            })
+
+            StoredInfo.Sections[Settings.Title] = SectionContent
+            return SectionContent
+        end
+
+        function Tab:AddLabel(Settings)
+            return New("TextLabel", {
+                Size = UDim2.new(1, -10, 0, 20),
+                BackgroundTransparency = 1,
+                Text = Settings.Text,
+                TextColor3 = Color3.fromRGB(200, 200, 200),
+                TextSize = 14,
+                FontFace = Font.new(Creator.Font, Enum.FontWeight.Medium),
+                TextXAlignment = "Left",
+                TextWrapped = true,
+                Parent = Settings.Section or TabContent,
+            })
+        end
+
+        function Tab:AddButton(Settings)
+            return New("Frame", {
+                Size = UDim2.new(1, -10, 0, 50),
+                BackgroundColor3 = Color3.fromRGB(40, 40, 40),
+                BackgroundTransparency = 0,
+                Parent = Settings.Section or TabContent,
+            }, {
+                New("UICorner", {
+                    CornerRadius = UDim.new(0, 5)
+                }),
+                New("Frame", {
+                    Name = "Labels",
+                    Size = UDim2.new(1, 0, 1, 0),
+                    BackgroundTransparency = 1,
+                }, {
+                    New("TextLabel", {
+                        Name = "Title",
+                        Size = UDim2.new(1, 0, 0, 20),
+                        BackgroundTransparency = 1,
+                        Text = "→ " .. Settings.Title,
+                        TextColor3 = Color3.fromRGB(240, 240, 240),
+                        TextSize = 16,
+                        FontFace = Font.new(Creator.Font, Enum.FontWeight.SemiBold),
+                        TextXAlignment = "Left",
+                    }),
+                    New("TextLabel", {
+                        Name = "Description",
+                        Size = UDim2.new(1, 0, 0, 30),
+                        Position = UDim2.new(0, 0, 0, 20),
+                        BackgroundTransparency = 1,
+                        Text = Settings.Description,
+                        TextColor3 = Color3.fromRGB(200, 200, 200),
+                        TextSize = 14,
+                        FontFace = Font.new(Creator.Font, Enum.FontWeight.Medium),
+                        TextXAlignment = "Left",
+                        TextWrapped = true,
+                    })
+                })
+            })
+        end
+
+        function Tab:AddToggle(Settings)
+            local Toggle = New("Frame", {
+                Size = UDim2.new(1, -10, 0, 50),
+                BackgroundColor3 = Color3.fromRGB(40, 40, 40),
+                BackgroundTransparency = 0,
+                Parent = Settings.Section or TabContent,
+            }, {
+                New("UICorner", {
+                    CornerRadius = UDim.new(0, 5)
+                }),
+                New("Frame", {
+                    Name = "Labels",
+                    Size = UDim2.new(1, -40, 1, 0),
+                    BackgroundTransparency = 1,
+                }, {
+                    New("TextLabel", {
+                        Name = "Title",
+                        Size = UDim2.new(1, 0, 0, 20),
+                        BackgroundTransparency = 1,
+                        Text = Settings.Title,
+                        TextColor3 = Color3.fromRGB(240, 240, 240),
+                        TextSize = 16,
+                        FontFace = Font.new(Creator.Font, Enum.FontWeight.SemiBold),
+                        TextXAlignment = "Left",
+                    }),
+                    New("TextLabel", {
+                        Name = "Description",
+                        Size = UDim2.new(1, 0, 0, 30),
+                        Position = UDim2.new(0, 0, 0, 20),
+                        BackgroundTransparency = 1,
+                        Text = Settings.Description,
+                        TextColor3 = Color3.fromRGB(200, 200, 200),
+                        TextSize = 14,
+                        FontFace = Font.new(Creator.Font, Enum.FontWeight.Medium),
+                        TextXAlignment = "Left",
+                        TextWrapped = true,
+                    })
+                }),
+                New("BoolValue", {
+                    Name = "Value",
+                    Value = Settings.Default,
+                }),
+                New("TextButton", {
+                    Name = "Main",
+                    Size = UDim2.new(0, 30, 0, 14),
+                    Position = UDim2.new(1, -30, 0.5, -7),
+                    BackgroundColor3 = Color3.fromRGB(45, 45, 45),
+                }, {
+                    New("UICorner", {
+                        CornerRadius = UDim.new(0, 5)
+                    }),
+                    New("TextLabel", {
+                        Name = "ToggleText",
+                        Size = UDim2.new(1, 0, 1, 0),
+                        BackgroundTransparency = 1,
+                        Text = Settings.Default and "=ｏ" or "ｏ=",
+                        TextColor3 = Color3.fromRGB(255, 255, 255),
+                        TextSize = 12,
+                        FontFace = Font.new(Creator.Font, Enum.FontWeight.Medium),
+                        TextXAlignment = "Center",
+                    })
+                })
+            })
+
+            local function Set(Value)
+                Toggle.Main.ToggleText.Text = Value and "=ｏ" or "ｏ="
+                Toggle.Value.Value = Value
             end
-        else
-            error("[UI LIB]: Tab " .. TabName .. " does not exist")
+
+            Toggle.Main.MouseButton1Click:Connect(function()
+                local Value = not Toggle.Value.Value
+                Set(Value)
+                Settings.Callback(Value)
+            end)
+
+            Set(Settings.Default)
+            return Toggle
+        end
+
+        function Tab:AddDropdown(Settings)
+            local Dropdown = New("Frame", {
+                Size = UDim2.new(1, -10, 0, 30),
+                BackgroundTransparency = 1,
+                Parent = Settings.Section or TabContent,
+            }, {
+                New("TextButton", {
+                    Size = UDim2.new(1, 0, 1, 0),
+                    BackgroundTransparency = 1,
+                    Text = "",
+                }, {
+                    New("TextLabel", {
+                        Size = UDim2.new(0, 100, 1, 0),
+                        BackgroundTransparency = 1,
+                        Text = Settings.Title,
+                        TextColor3 = Color3.fromRGB(240, 240, 240),
+                        TextSize = 16,
+                        FontFace = Font.new(Creator.Font, Enum.FontWeight.SemiBold),
+                        TextXAlignment = "Left",
+                    }),
+                    New("TextLabel", {
+                        Name = "Selected",
+                        Size = UDim2.new(0, 100, 1, 0),
+                        Position = UDim2.new(0, 100, 0, 0),
+                        BackgroundTransparency = 1,
+                        Text = Settings.Default,
+                        TextColor3 = Color3.fromRGB(240, 240, 240),
+                        TextSize = 14,
+                        FontFace = Font.new(Creator.Font, Enum.FontWeight.Medium),
+                        TextXAlignment = "Left",
+                    }),
+                    New("TextLabel", {
+                        Name = "Icon",
+                        Size = UDim2.new(0, 30, 1, 0),
+                        Position = UDim2.new(1, -30, 0, 0),
+                        BackgroundTransparency = 1,
+                        Text = "(__)",
+                        TextColor3 = Color3.fromRGB(240, 240, 240),
+                        TextSize = 16,
+                        FontFace = Font.new(Creator.Font, Enum.FontWeight.Medium),
+                        TextXAlignment = "Center",
+                    })
+                }),
+                New("Frame", {
+                    Name = "List",
+                    Size = UDim2.new(1, 0, 0, 0),
+                    Position = UDim2.new(0, 0, 1, 5),
+                    BackgroundColor3 = Color3.fromRGB(40, 40, 40),
+                    BackgroundTransparency = 0,
+                    Visible = false,
+                }, {
+                    New("UICorner", {
+                        CornerRadius = UDim.new(0, 5)
+                    }),
+                    New("UIListLayout", {
+                        SortOrder = "LayoutOrder",
+                        Padding = UDim.new(0, 2)
+                    }),
+                    New("UIPadding", {
+                        PaddingTop = UDim.new(0, 2),
+                        PaddingBottom = UDim.new(0, 2),
+                        PaddingLeft = UDim.new(0, 2),
+                        PaddingRight = UDim.new(0, 2),
+                    })
+                })
+            })
+
+            local IsOpen = false
+
+            for _, Option in pairs(Settings.Options) do
+                local OptionButton = New("TextButton", {
+                    Size = UDim2.new(1, 0, 0, 20),
+                    BackgroundColor3 = Color3.fromRGB(45, 45, 45),
+                    Text = Option,
+                    TextColor3 = Color3.fromRGB(240, 240, 240),
+                    TextSize = 14,
+                    FontFace = Font.new(Creator.Font, Enum.FontWeight.Medium),
+                    TextXAlignment = "Left",
+                    Parent = Dropdown.List,
+                }, {
+                    New("UICorner", {
+                        CornerRadius = UDim.new(0, 5)
+                    })
+                })
+
+                OptionButton.MouseButton1Click:Connect(function()
+                    Dropdown.TextButton.Selected.Text = Option
+                    Settings.Callback(Option)
+                    IsOpen = false
+                    Dropdown.List.Visible = false
+                    Dropdown.List.Size = UDim2.new(1, 0, 0, 0)
+                    Dropdown.TextButton.Icon.Text = "(__)"
+                end)
+            end
+
+            Dropdown.TextButton.MouseButton1Click:Connect(function()
+                IsOpen = not IsOpen
+                Dropdown.List.Visible = IsOpen
+                if IsOpen then
+                    Dropdown.List.Size = UDim2.new(1, 0, 0, #Settings.Options * 22 + 4)
+                    Dropdown.TextButton.Icon.Text = "(^^)"
+                else
+                    Dropdown.List.Size = UDim2.new(1, 0, 0, 0)
+                    Dropdown.TextButton.Icon.Text = "(__)"
+                end
+            end)
+
+            return Dropdown
+        end
+
+        return Tab
+    end
+
+    function Window:SelectTab(Tab)
+        for _, tab in pairs(StoredInfo.Tabs) do
+            local isSelected = (tab.TabButton.Name == Tab.Title)
+            tab.TabButton.Value.Value = isSelected
+            tab.TabContent.Visible = isSelected
+            if isSelected then
+                Window.CurrentTab = tab
+                TabHighlight.Size = UDim2.new(1, 0, 0, 30)
+                TabHighlight.Position = UDim2.new(0, 0, 0, (tab.TabButton.LayoutOrder - 1) * (30 + 6))
+            end
         end
     end
 
-    function Options:AddSection(Settings: { Title: string, Tab: Instance })
-        local Section = Instance.new("Frame")
-        Section.Name = Settings.Title
-        Section.Size = UDim2.new(1, -10, 0, 30)
-        Section.BackgroundColor3 = Theme.Component
-        Section.BackgroundTransparency = 0
-        Section.Parent = Settings.Tab or MainHolder:GetChildren()[1]
-
-        local SectionCorner = Instance.new("UICorner")
-        SectionCorner.CornerRadius = UDim.new(0, 5)
-        SectionCorner.Parent = Section
-
-        local SectionTitle = Instance.new("TextLabel")
-        SectionTitle.Size = UDim2.new(1, 0, 1, 0)
-        SectionTitle.BackgroundTransparency = 1
-        SectionTitle.Text = Settings.Title
-        SectionTitle.TextColor3 = Theme.Title
-        SectionTitle.TextSize = 16
-        SectionTitle.Font = Enum.Font.SourceSansBold
-        SectionTitle.TextXAlignment = Enum.TextXAlignment.Left
-        SectionTitle.Parent = Section
-
-        local SectionContent = Instance.new("Frame")
-        SectionContent.Name = "Content"
-        SectionContent.Size = UDim2.new(1, 0, 0, 0)
-        SectionContent.BackgroundTransparency = 1
-        SectionContent.AutomaticSize = Enum.AutomaticSize.Y
-        SectionContent.Parent = Settings.Tab or MainHolder:GetChildren()[1]
-
-        local SectionContentLayout = Instance.new("UIListLayout")
-        SectionContentLayout.SortOrder = Enum.SortOrder.LayoutOrder
-        SectionContentLayout.Padding = UDim.new(0, 5)
-        SectionContentLayout.Parent = SectionContent
-
-        StoredInfo.Sections[Settings.Title] = SectionContent
-
-        return SectionContent
+    function Window:Divider()
+        local Divider = New("Frame", {
+            Size = UDim2.new(1,0,0,1),
+            Position = UDim2.new(0.5,0,0,0),
+            AnchorPoint = Vector2.new(0.5,0),
+            BackgroundTransparency = .9,
+            ThemeTag = {
+                BackgroundColor3 = "Text"
+            }
+        })
+        New("Frame", {
+            Parent = Window.UIElements.SideBar.Frame,
+            Size = UDim2.new(1,-7,0,1),
+            BackgroundTransparency = 1,
+        }, {
+            Divider
+        })
     end
+    
+    local DialogModule = require("./Dialog").Init(Window)
+    function Window:Dialog(DialogConfig)
+        local DialogTable = {
+            Title = DialogConfig.Title or "Dialog",
+            Content = DialogConfig.Content,
+            Buttons = DialogConfig.Buttons or {},
+        }
+        local Dialog = DialogModule.Create()
+        
+        local DialogTopFrame = New("Frame", {
+            Size = UDim2.new(1,0,0,0),
+            AutomaticSize = "Y",
+            BackgroundTransparency = 1,
+            Parent = Dialog.UIElements.Main
+        }, {
+            New("UIListLayout", {
+                FillDirection = "Horizontal",
+                Padding = UDim.new(0,Dialog.UIPadding),
+                VerticalAlignment = "Center"
+            })
+        })
+        
+        local p
+        if DialogConfig.Icon and Creator.Icon(DialogConfig.Icon)[2] then
+            p = New("ImageLabel", {
+                Image = Creator.Icon(DialogConfig.Icon)[1],
+                ImageRectSize = Creator.Icon(DialogConfig.Icon)[2].ImageRectSize,
+                ImageRectOffset = Creator.Icon(DialogConfig.Icon)[2].ImageRectPosition,
+                ThemeTag = {
+                    ImageColor3 = "Text",
+                },
+                Size = UDim2.new(0,26,0,26),
+                BackgroundTransparency = 1,
+                Parent = DialogTopFrame
+            })
+        end
+        
+        Dialog.UIElements.UIListLayout = New("UIListLayout", {
+            Padding = UDim.new(0,8*2.3),
+            FillDirection = "Vertical",
+            HorizontalAlignment = "Left",
+            Parent = Dialog.UIElements.Main
+        })
+    
+        New("UISizeConstraint", {
+            MinSize = Vector2.new(180, 20),
+            MaxSize = Vector2.new(400, math.huge),
+            Parent = Dialog.UIElements.Main,
+        })
+        
+        Dialog.UIElements.Title = New("TextLabel", {
+            Text = DialogTable.Title,
+            TextSize = 19,
+            FontFace = Font.new(Creator.Font, Enum.FontWeight.SemiBold),
+            TextXAlignment = "Left",
+            TextWrapped = true,
+            RichText = true,
+            Size = UDim2.new(1,p and -26-Dialog.UIPadding or 0,0,0),
+            AutomaticSize = "Y",
+            ThemeTag = {
+                TextColor3 = "Text"
+            },
+            BackgroundTransparency = 1,
+            Parent = DialogTopFrame
+        })
+        if DialogTable.Content then
+            local Content = New("TextLabel", {
+                Text = DialogTable.Content,
+                TextSize = 18,
+                TextTransparency = .4,
+                TextWrapped = true,
+                RichText = true,
+                FontFace = Font.new(Creator.Font, Enum.FontWeight.Medium),
+                TextXAlignment = "Left",
+                Size = UDim2.new(1,0,0,0),
+                AutomaticSize = "Y",
+                LayoutOrder = 2,
+                ThemeTag = {
+                    TextColor3 = "Text"
+                },
+                BackgroundTransparency = 1,
+                Parent = Dialog.UIElements.Main
+            })
+        end
+        
+        local ButtonsLayout = New("UIListLayout", {
+            Padding = UDim.new(0, 10),
+            FillDirection = "Horizontal",
+            HorizontalAlignment = "Right",
+        })
+        
+        local ButtonsContent = New("Frame", {
+            Size = UDim2.new(1,0,0,40),
+            AutomaticSize = "None",
+            BackgroundTransparency = 1,
+            Parent = Dialog.UIElements.Main,
+            LayoutOrder = 4,
+        }, {
+            ButtonsLayout,
+        })
+        
+        local CreateButton = require("./UI").Button
+        local Buttons = {}
 
-    function Options:AddLabel(Settings: { Text: string, Tab: Instance, Section: Instance })
-        local Label = Instance.new("TextLabel")
-        Label.Size = UDim2.new(1, -10, 0, 20)
-        Label.BackgroundTransparency = 1
-        Label.Text = Settings.Text
-        Label.TextColor3 = Theme.Description
-        Label.TextSize = 14
-        Label.Font = Enum.Font.SourceSans
-        Label.TextXAlignment = Enum.TextXAlignment.Left
-        Label.TextWrapped = true
-        Label.Parent = Settings.Section or Settings.Tab or MainHolder:GetChildren()[1]
+        for _,Button in next, DialogTable.Buttons do
+            local ButtonFrame = CreateButton(Button.Title, Button.Icon, Button.Callback, Button.Variant, ButtonsContent, Dialog)
+            table.insert(Buttons, ButtonFrame)
+        end
+        
+        local function CheckButtonsOverflow()
+            local totalWidth = ButtonsLayout.AbsoluteContentSize.X
+            local parentWidth = ButtonsContent.AbsoluteSize.X - 1
+            
+            if totalWidth > parentWidth then
+                ButtonsLayout.FillDirection = "Vertical"
+                ButtonsLayout.HorizontalAlignment = "Right"
+                ButtonsLayout.VerticalAlignment = "Bottom"
+                ButtonsContent.AutomaticSize = "Y"
+                
+                for _, button in ipairs(Buttons) do
+                    button.Size = UDim2.new(1, 0, 0, 40)
+                    button.AutomaticSize = "None"
+                end
+            else
+                ButtonsLayout.FillDirection = "Horizontal"
+                ButtonsLayout.HorizontalAlignment = "Right"
+                ButtonsLayout.VerticalAlignment = "Center"
+                ButtonsContent.AutomaticSize = "None"
+                
+                for _, button in ipairs(Buttons) do
+                    button.Size = UDim2.new(0, 0, 1, 0)
+                    button.AutomaticSize = "X"
+                end
+            end
+        end
+        
+        Dialog.UIElements.Main:GetPropertyChangedSignal("AbsoluteSize"):Connect(CheckButtonsOverflow)
+        CheckButtonsOverflow()
+
+        Dialog:Open()
+        
+        return Dialog
     end
+    
+    Window:CreateTopbarButton("x", function()
+        Tween(Window.UIElements.Main, 0.35, {Position = UDim2.new(0.5,0,0.5,0)}, Enum.EasingStyle.Quint, Enum.EasingDirection.Out):Play()
+        Window:Dialog({
+            Icon = "trash-2",
+            Title = "Close Window",
+            Content = "Do you want to close this window? You will not be able to open it again.",
+            Buttons = {
+                {
+                    Title = "Cancel",
+                    Callback = function() end,
+                    Variant = "Secondary",
+                },
+                {
+                    Title = "Close Window",
+                    Callback = function() Window:Close():Destroy() end,
+                    Variant = "Primary",
+                }
+            }
+        })
+    end, 999)
 
-    function Options:AddButton(Settings: { Title: string, Description: string, Tab: Instance, Section: Instance }) 
-        local Paragraph = Instance.new("Frame")
-        Paragraph.Size = UDim2.new(1, -10, 0, 50)
-        Paragraph.BackgroundColor3 = Theme.Component
-        Paragraph.BackgroundTransparency = 0
-        Paragraph.Parent = Settings.Section or Settings.Tab or MainHolder:GetChildren()[1]
+    local isResizing = false
+    local initialSize
+    local initialInputPosition
 
-        local ParagraphCorner = Instance.new("UICorner")
-        ParagraphCorner.CornerRadius = UDim.new(0, 5)
-        ParagraphCorner.Parent = Paragraph
-
-        local Labels = Instance.new("Frame")
-        Labels.Name = "Labels"
-        Labels.Size = UDim2.new(1, 0, 1, 0)
-        Labels.BackgroundTransparency = 1
-        Labels.Parent = Paragraph
-
-        local Title = Instance.new("TextLabel")
-        Title.Name = "Title"
-        Title.Size = UDim2.new(1, 0, 0, 20)
-        Title.BackgroundTransparency = 1
-        Title.Text = "→ " .. Settings.Title -- Arrow prefix
-        Title.TextColor3 = Theme.Title
-        Title.TextSize = 16
-        Title.Font = Enum.Font.SourceSansBold
-        Title.TextXAlignment = Enum.TextXAlignment.Left
-        Title.Parent = Labels
-
-        local Description = Instance.new("TextLabel")
-        Description.Name = "Description"
-        Description.Size = UDim2.new(1, 0, 0, 30)
-        Description.Position = UDim2.new(0, 0, 0, 20)
-        Description.BackgroundTransparency = 1
-        Description.Text = Settings.Description
-        Description.TextColor3 = Theme.Description
-        Description.TextSize = 14
-        Description.Font = Enum.Font.SourceSans
-        Description.TextXAlignment = Enum.TextXAlignment.Left
-        Description.TextWrapped = true
-        Description.Parent = Labels
-    end
-
-    function Options:AddToggle(Settings: { Title: string, Description: string, Default: boolean, Callback: any, Tab: Instance, Section: Instance }) 
-        local Toggle = Instance.new("Frame")
-        Toggle.Size = UDim2.new(1, -10, 0, 50)
-        Toggle.BackgroundColor3 = Theme.Component
-        Toggle.BackgroundTransparency = 0
-        Toggle.Parent = Settings.Section or Settings.Tab or MainHolder:GetChildren()[1]
-
-        local ToggleCorner = Instance.new("UICorner")
-        ToggleCorner.CornerRadius = UDim.new(0, 5)
-        ToggleCorner.Parent = Toggle
-
-        local Labels = Instance.new("Frame")
-        Labels.Name = "Labels"
-        Labels.Size = UDim2.new(1, -40, 1, 0)
-        Labels.BackgroundTransparency = 1
-        Labels.Parent = Toggle
-
-        local Title = Instance.new("TextLabel")
-        Title.Name = "Title"
-        Title.Size = UDim2.new(1, 0, 0, 20)
-        Title.BackgroundTransparency = 1
-        Title.Text = Settings.Title
-        Title.TextColor3 = Theme.Title
-        Title.TextSize = 16
-        Title.Font = Enum.Font.SourceSansBold
-        Title.TextXAlignment = Enum.TextXAlignment.Left
-        Title.Parent = Labels
-
-        local Description = Instance.new("TextLabel")
-        Description.Name = "Description"
-        Description.Size = UDim2.new(1, 0, 0, 30)
-        Description.Position = UDim2.new(0, 0, 0, 20)
-        Description.BackgroundTransparency = 1
-        Description.Text = Settings.Description
-        Description.TextColor3 = Theme.Description
-        Description.TextSize = 14
-        Description.Font = Enum.Font.SourceSans
-        Description.TextXAlignment = Enum.TextXAlignment.Left
-        Description.TextWrapped = true
-        Description.Parent = Labels
-
-        local On = Instance.new("BoolValue")
-        On.Name = "Value"
-        On.Value = Settings.Default
-        On.Parent = Toggle
-
-        local Main = Instance.new("TextButton")
-        Main.Name = "Main"
-        Main.Size = UDim2.new(0, 30, 0, 14)
-        Main.Position = UDim2.new(1, -30, 0.5, -7)
-        Main.BackgroundColor3 = Theme.Interactables
-        Main.Parent = Toggle
-
-        local ToggleCorner = Instance.new("UICorner")
-        ToggleCorner.CornerRadius = UDim.new(0, 5)
-        ToggleCorner.Parent = Main
-
-        local ToggleText = Instance.new("TextLabel")
-        ToggleText.Name = "ToggleText"
-        ToggleText.Size = UDim2.new(1, 0, 1, 0)
-        ToggleText.BackgroundTransparency = 1
-        ToggleText.Text = Settings.Default and "=ｏ" or "ｏ="
-        ToggleText.TextColor3 = Color3.fromRGB(255, 255, 255)
-        ToggleText.TextSize = 12
-        ToggleText.Font = Enum.Font.SourceSans
-        ToggleText.TextXAlignment = Enum.TextXAlignment.Center
-        ToggleText.Parent = Main
-
-        local Set = function(Value)
-            ToggleText.Text = Value and "=ｏ" or "ｏ="
-            On.Value = Value
-        end 
-
-        Connect(Main.MouseButton1Click, function()
-            local Value = not On.Value
-            Set(Value)
-            Settings.Callback(Value)
-        end)
-
-        Set(Settings.Default)
-    end
-
-    function Options:AddDropdown(Settings: { Title: string, Options: {string}, Default: string, Callback: any, Tab: Instance, Section: Instance })
-        local Dropdown = Instance.new("Frame")
-        Dropdown.Size = UDim2.new(1, -10, 0, 30)
-        Dropdown.BackgroundTransparency = 1 -- Transparent
-        Dropdown.Parent = Settings.Section or Settings.Tab or MainHolder:GetChildren()[1]
-
-        local DropdownButton = Instance.new("TextButton")
-        DropdownButton.Size = UDim2.new(1, 0, 1, 0)
-        DropdownButton.BackgroundTransparency = 1
-        DropdownButton.Text = ""
-        DropdownButton.Parent = Dropdown
-
-        local DropdownTitle = Instance.new("TextLabel")
-        DropdownTitle.Size = UDim2.new(0, 100, 1, 0)
-        DropdownTitle.BackgroundTransparency = 1
-        DropdownTitle.Text = Settings.Title
-        DropdownTitle.TextColor3 = Theme.Title
-        DropdownTitle.TextSize = 16
-        DropdownTitle.Font = Enum.Font.SourceSansBold
-        DropdownTitle.TextXAlignment = Enum.TextXAlignment.Left
-        DropdownTitle.Parent = DropdownButton
-
-        local DropdownSelected = Instance.new("TextLabel")
-        DropdownSelected.Size = UDim2.new(0, 100, 1, 0)
-        DropdownSelected.Position = UDim2.new(0, 100, 0, 0)
-        DropdownSelected.BackgroundTransparency = 1
-        DropdownSelected.Text = Settings.Default
-        DropdownSelected.TextColor3 = Theme.Title -- Changed to match Title for better visibility
-        DropdownSelected.TextSize = 14
-        DropdownSelected.Font = Enum.Font.SourceSans
-        DropdownSelected.TextXAlignment = Enum.TextXAlignment.Left
-        DropdownSelected.Parent = DropdownButton
-
-        local DropdownIcon = Instance.new("TextLabel")
-        DropdownIcon.Size = UDim2.new(0, 30, 1, 0)
-        DropdownIcon.Position = UDim2.new(1, -30, 0, 0)
-        DropdownIcon.BackgroundTransparency = 1
-        DropdownIcon.Text = "(__)"
-        DropdownIcon.TextColor3 = Theme.Title
-        DropdownIcon.TextSize = 16
-        DropdownIcon.Font = Enum.Font.SourceSans
-        DropdownIcon.TextXAlignment = Enum.TextXAlignment.Center
-        DropdownIcon.Parent = DropdownButton
-
-        local DropdownList = Instance.new("Frame")
-        DropdownList.Size = UDim2.new(1, 0, 0, 0)
-        DropdownList.Position = UDim2.new(0, 0, 1, 5)
-        DropdownList.BackgroundColor3 = Theme.Component
-        DropdownList.BackgroundTransparency = 0
-        DropdownList.Visible = false
-        DropdownList.Parent = Dropdown
-
-        local DropdownListCorner = Instance.new("UICorner")
-        DropdownListCorner.CornerRadius = UDim.new(0, 5)
-        DropdownListCorner.Parent = DropdownList
-
-        local DropdownListLayout = Instance.new("UIListLayout")
-        DropdownListLayout.SortOrder = Enum.SortOrder.LayoutOrder
-        DropdownListLayout.Padding = UDim.new(0, 2)
-        DropdownListLayout.Parent = DropdownList
-
-        local DropdownListPadding = Instance.new("UIPadding")
-        DropdownListPadding.PaddingTop = UDim.new(0, 2)
-        DropdownListPadding.PaddingBottom = UDim.new(0, 2)
-        DropdownListPadding.PaddingLeft = UDim.new(0, 2)
-        DropdownListPadding.PaddingRight = UDim.new(0, 2)
-        DropdownListPadding.Parent = DropdownList
-
-        local IsOpen = false
-
-        for _, Option in pairs(Settings.Options) do
-            local OptionButton = Instance.new("TextButton")
-            OptionButton.Size = UDim2.new(1, 0, 0, 20)
-            OptionButton.BackgroundColor3 = Theme.Interactables
-            OptionButton.Text = Option
-            OptionButton.TextColor3 = Theme.Title
-            OptionButton.TextSize = 14
-            OptionButton.Font = Enum.Font.SourceSans
-            OptionButton.TextXAlignment = Enum.TextXAlignment.Left
-            OptionButton.Parent = DropdownList
-
-            local OptionCorner = Instance.new("UICorner")
-            OptionCorner.CornerRadius = UDim.new(0, 5)
-            OptionCorner.Parent = OptionButton
-
-            OptionButton.MouseButton1Click:Connect(function()
-                DropdownSelected.Text = Option
-                Settings.Callback(Option)
-                IsOpen = false
-                DropdownList.Visible = false
-                DropdownList.Size = UDim2.new(1, 0, 0, 0)
+    local function startResizing(input)
+        if Window.CanResize then
+            isResizing = true
+            FullScreenIcon.Active = true
+            initialSize = Window.UIElements.Main.Size
+            initialInputPosition = input.Position
+            Tween(FullScreenIcon, 0.2, {ImageTransparency = .65}):Play()
+            Tween(FullScreenIcon.ImageLabel, 0.2, {ImageTransparency = 0}):Play()
+            Tween(ResizeHandle.ImageLabel, 0.1, {ImageTransparency = .35}):Play()
+        
+            input.Changed:Connect(function()
+                if input.UserInputState == Enum.UserInputState.End then
+                    isResizing = false
+                    FullScreenIcon.Active = false
+                    Tween(FullScreenIcon, 0.2, {ImageTransparency = 1}):Play()
+                    Tween(FullScreenIcon.ImageLabel, 0.2, {ImageTransparency = 1}):Play()
+                    Tween(ResizeHandle.ImageLabel, 0.2, {ImageTransparency = .8}):Play()
+                end
             end)
         end
-
-        DropdownButton.MouseButton1Click:Connect(function()
-            IsOpen = not IsOpen
-            DropdownList.Visible = IsOpen
-            if IsOpen then
-                DropdownList.Size = UDim2.new(1, 0, 0, #Settings.Options * 22 + 4)
-                DropdownIcon.Text = "(^^)"
-            else
-                DropdownList.Size = UDim2.new(1, 0, 0, 0)
-                DropdownIcon.Text = "(__)"
+    end
+    
+    ResizeHandle.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            if Window.CanResize then
+                startResizing(input)
             end
+        end
+    end)
+    
+    UserInputService.InputChanged:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+            if isResizing and Window.CanResize then
+                local delta = input.Position - initialInputPosition
+                local newSize = UDim2.new(0, initialSize.X.Offset + delta.X*2, 0, initialSize.Y.Offset + delta.Y*2)
+                
+                Tween(Window.UIElements.Main, 0.06, {
+                    Size = UDim2.new(
+                    0, math.clamp(newSize.X.Offset, 480, 700),
+                    0, math.clamp(newSize.Y.Offset, 350, 520)
+                )}):Play()
+            end
+        end
+    end)
+    
+    local SearchBar = require("./SearchBar")
+    local IsOpen = false
+    local CurrentSearchBar
+
+    local SearchButton
+    SearchButton = Window:CreateTopbarButton("search", function() 
+        if IsOpen then return end
+        
+        SearchBar.new(Window.TabModule, Window.UIElements.Main, function()
+            IsOpen = false
+            Window.CanResize = true
+            
+            Tween(FullScreenBlur, 0.1, {ImageTransparency = 1}):Play()
+            FullScreenBlur.Active = false
         end)
-    end
+        Tween(FullScreenBlur, 0.1, {ImageTransparency = .65}):Play()
+        FullScreenBlur.Active = true
+        
+        IsOpen = true
+        Window.CanResize = false
+    end, 996)
 
-    function Options:addIcon(DecalId: string)
-        Icon.Image = DecalId
-    end
-
-    return Options
+    return Window
 end
-
-return Library
