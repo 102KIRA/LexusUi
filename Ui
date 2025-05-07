@@ -42,8 +42,12 @@ end
 
 --// Custom UI Setup
 local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "EnhancedUI"
+ScreenGui.Name = "CircularComponentUI"
 ScreenGui.Parent = game.CoreGui
+
+local StoredInfo = {
+    Tabs = {}
+}
 
 local Library = {}
 
@@ -54,18 +58,41 @@ function Library:CreateWindow(Settings: { Title: string, Size: UDim2 })
     Window.Size = Settings.Size or Setup.Size
     Window.Position = UDim2.new(0.5, -Window.Size.X.Offset / 2, 0.5, -Window.Size.Y.Offset / 2)
     Window.BackgroundColor3 = Theme.Primary
+    Window.BackgroundTransparency = 0.75 -- 75% transparency
     Window.BorderSizePixel = 0
     Window.Parent = ScreenGui
 
-    -- Top Bar (Frame for control buttons and icon)
-    local TopBar = Instance.new("Frame")
-    TopBar.Name = "Top"
-    TopBar.Size = UDim2.new(1, 0, 0, 30)
-    TopBar.BackgroundColor3 = Theme.Secondary
-    TopBar.BorderSizePixel = 0
-    TopBar.Parent = Window
+    local WindowCorner = Instance.new("UICorner")
+    WindowCorner.CornerRadius = UDim.new(0, 10)
+    WindowCorner.Parent = Window
 
-    -- Icon (optional decal for window)
+    -- Sidebar (Frame for tabs)
+    local Sidebar = Instance.new("Frame")
+    Sidebar.Name = "Sidebar"
+    Sidebar.Size = UDim2.new(0, 150, 1, 0)
+    Sidebar.BackgroundColor3 = Theme.Primary
+    Sidebar.BackgroundTransparency = 0.75
+    Sidebar.BorderSizePixel = 0
+    Sidebar.Parent = Window
+
+    local SidebarCorner = Instance.new("UICorner")
+    SidebarCorner.CornerRadius = UDim.new(0, 10)
+    SidebarCorner.Parent = Sidebar
+
+    -- Sidebar Top (Frame for control buttons and icon)
+    local SidebarTop = Instance.new("Frame")
+    SidebarTop.Name = "Top"
+    SidebarTop.Size = UDim2.new(1, 0, 0, 30)
+    SidebarTop.BackgroundColor3 = Theme.Secondary
+    SidebarTop.BackgroundTransparency = 0.75
+    SidebarTop.BorderSizePixel = 0
+    SidebarTop.Parent = Sidebar
+
+    local SidebarTopCorner = Instance.new("UICorner")
+    SidebarTopCorner.CornerRadius = UDim.new(0, 10)
+    SidebarTopCorner.Parent = SidebarTop
+
+    -- Icon (decal for window)
     local Icon = Instance.new("ImageLabel")
     Icon.Name = "Icon"
     Icon.Size = UDim2.new(0, 20, 0, 20)
@@ -73,7 +100,7 @@ function Library:CreateWindow(Settings: { Title: string, Size: UDim2 })
     Icon.BackgroundTransparency = 1
     Icon.Image = ""
     Icon.ImageColor3 = Theme.Title
-    Icon.Parent = TopBar
+    Icon.Parent = SidebarTop
 
     -- Buttons Frame (for control buttons)
     local ButtonsFrame = Instance.new("Frame")
@@ -81,7 +108,7 @@ function Library:CreateWindow(Settings: { Title: string, Size: UDim2 })
     ButtonsFrame.Size = UDim2.new(0, 90, 1, 0)
     ButtonsFrame.Position = UDim2.new(1, -90, 0, 0)
     ButtonsFrame.BackgroundTransparency = 1
-    ButtonsFrame.Parent = TopBar
+    ButtonsFrame.Parent = SidebarTop
 
     local ButtonsLayout = Instance.new("UIListLayout")
     ButtonsLayout.FillDirection = Enum.FillDirection.Horizontal
@@ -90,35 +117,42 @@ function Library:CreateWindow(Settings: { Title: string, Size: UDim2 })
     ButtonsLayout.Padding = UDim.new(0, 5)
     ButtonsLayout.Parent = ButtonsFrame
 
-    -- Content Area (ScrollingFrame for components)
-    local Content = Instance.new("ScrollingFrame")
-    Content.Name = "Content"
-    Content.Size = UDim2.new(1, 0, 1, -30)
-    Content.Position = UDim2.new(0, 0, 0, 30)
-    Content.BackgroundColor3 = Theme.Primary
-    Content.BorderSizePixel = 0
-    Content.ScrollBarThickness = 5
-    Content.ScrollBarImageColor3 = Theme.Component
-    Content.CanvasSize = UDim2.new(0, 0, 0, 0)
-    Content.AutomaticCanvasSize = Enum.AutomaticSize.Y
-    Content.Parent = Window
+    -- Tab Container (Frame for tab buttons)
+    local TabContainer = Instance.new("Frame")
+    TabContainer.Name = "TabContainer"
+    TabContainer.Size = UDim2.new(1, 0, 1, -30)
+    TabContainer.Position = UDim2.new(0, 0, 0, 30)
+    TabContainer.BackgroundTransparency = 1
+    TabContainer.Parent = Sidebar
 
-    local ContentLayout = Instance.new("UIListLayout")
-    ContentLayout.SortOrder = Enum.SortOrder.LayoutOrder
-    ContentLayout.Padding = UDim.new(0, 5)
-    ContentLayout.Parent = Content
+    local TabLayout = Instance.new("UIListLayout")
+    TabLayout.SortOrder = Enum.SortOrder.LayoutOrder
+    TabLayout.Padding = UDim.new(0, 5)
+    TabLayout.Parent = TabContainer
 
-    local ContentPadding = Instance.new("UIPadding")
-    ContentPadding.PaddingTop = UDim.new(0, 5)
-    ContentPadding.PaddingLeft = UDim.new(0, 5)
-    ContentPadding.PaddingRight = UDim.new(0, 5)
-    ContentPadding.Parent = Content
+    local TabPadding = Instance.new("UIPadding")
+    TabPadding.PaddingTop = UDim.new(0, 5)
+    TabPadding.Parent = TabContainer
+
+    -- Main Content Area (Frame for tab content)
+    local MainHolder = Instance.new("Frame")
+    MainHolder.Name = "MainHolder"
+    MainHolder.Size = UDim2.new(1, -150, 1, 0)
+    MainHolder.Position = UDim2.new(0, 150, 0, 0)
+    MainHolder.BackgroundColor3 = Theme.Primary
+    MainHolder.BackgroundTransparency = 0.75
+    MainHolder.BorderSizePixel = 0
+    MainHolder.Parent = Window
+
+    local MainHolderCorner = Instance.new("UICorner")
+    MainHolderCorner.CornerRadius = UDim.new(0, 10)
+    MainHolderCorner.Parent = MainHolder
 
     local Options = {}
     local Opened = true
     local Maximized = false
 
-    -- Create Control Buttons
+    -- Create Control Buttons (Rectangular with rounded corners)
     local function CreateControlButton(Name, Text, Color)
         local Button = Instance.new("TextButton")
         Button.Name = Name
@@ -130,6 +164,11 @@ function Library:CreateWindow(Settings: { Title: string, Size: UDim2 })
         Button.Font = Enum.Font.SourceSansBold
         Button.BorderSizePixel = 0
         Button.Parent = ButtonsFrame
+
+        local ButtonCorner = Instance.new("UICorner")
+        ButtonCorner.CornerRadius = UDim.new(0, 5) -- Rounded corners, not fully circular
+        ButtonCorner.Parent = Button
+
         return Button
     end
 
@@ -175,19 +214,137 @@ function Library:CreateWindow(Settings: { Title: string, Size: UDim2 })
         end
     end)
 
+    -- Tab Management
+    function Options:SetTab(Name: string)
+        for Index, Button in next, TabContainer:GetChildren() do
+            if Button:IsA("TextButton") then
+                local Opened, SameName = Button:FindFirstChild("Value"), (Button.Name == Name)
+                if SameName and not Opened.Value then
+                    SetProperty(Opened, { Value = true })
+                elseif not SameName and Opened.Value then
+                    SetProperty(Opened, { Value = false })
+                end
+            end
+        end
+
+        for Index, Main in next, MainHolder:GetChildren() do
+            if Main:IsA("ScrollingFrame") then
+                local SameName = (Main.Name == Name)
+                Main.Visible = SameName
+            end
+        end
+    end
+
     -- Component Functions
-    function Options:AddButton(Settings: { Title: string, Description: string, Callback: any }) 
-        local Button = Instance.new("TextButton")
-        Button.Size = UDim2.new(1, -10, 0, 50)
-        Button.BackgroundColor3 = Theme.Component
-        Button.Text = ""
-        Button.Parent = Content
+    function Options:AddTab(Settings: { Title: string })
+        if StoredInfo.Tabs[Settings.Title] then 
+            error("[UI LIB]: A tab with the same name has already been created") 
+        end 
+
+        -- Tab Button
+        local TabButton = Instance.new("TextButton")
+        TabButton.Name = Settings.Title
+        TabButton.Size = UDim2.new(1, -10, 0, 30)
+        TabButton.BackgroundColor3 = Theme.Component
+        TabButton.BackgroundTransparency = 0.75
+        TabButton.Text = ""
+        TabButton.LayoutOrder = #StoredInfo.Tabs + 1
+        TabButton.Parent = TabContainer
+
+        local TabButtonCorner = Instance.new("UICorner")
+        TabButtonCorner.CornerRadius = UDim.new(0, 5)
+        TabButtonCorner.Parent = TabButton
+
+        local TabText = Instance.new("TextLabel")
+        TabText.Size = UDim2.new(1, -30, 1, 0)
+        TabText.Position = UDim2.new(0, 30, 0, 0)
+        TabText.BackgroundTransparency = 1
+        TabText.Text = Settings.Title
+        TabText.TextColor3 = Theme.Title
+        TabText.TextSize = 16
+        TabText.Font = Enum.Font.SourceSans
+        TabText.TextXAlignment = Enum.TextXAlignment.Left
+        TabText.Parent = TabButton
+
+        local TabIcon = Instance.new("ImageLabel")
+        TabIcon.Name = "TabIcon"
+        TabIcon.Size = UDim2.new(0, 20, 0, 20)
+        TabIcon.Position = UDim2.new(0, 5, 0.5, -10)
+        TabIcon.BackgroundTransparency = 1
+        TabIcon.Image = ""
+        TabIcon.ImageColor3 = Theme.Title
+        TabIcon.Parent = TabButton
+
+        local Value = Instance.new("BoolValue")
+        Value.Name = "Value"
+        Value.Value = false
+        Value.Parent = TabButton
+
+        -- Main Content for Tab
+        local TabContent = Instance.new("ScrollingFrame")
+        TabContent.Name = Settings.Title
+        TabContent.Size = UDim2.new(1, 0, 1, 0)
+        TabContent.BackgroundTransparency = 1
+        TabContent.Visible = false
+        TabContent.ScrollBarThickness = 5
+        TabContent.ScrollBarImageColor3 = Theme.Component
+        TabContent.CanvasSize = UDim2.new(0, 0, 0, 0)
+        TabContent.AutomaticCanvasSize = Enum.AutomaticSize.Y
+        TabContent.Parent = MainHolder
+
+        local TabContentLayout = Instance.new("UIListLayout")
+        TabContentLayout.SortOrder = Enum.SortOrder.LayoutOrder
+        TabContentLayout.Padding = UDim.new(0, 5)
+        TabContentLayout.Parent = TabContent
+
+        local TabContentPadding = Instance.new("UIPadding")
+        TabContentPadding.PaddingTop = UDim.new(0, 5)
+        TabContentPadding.PaddingLeft = UDim.new(0, 5)
+        TabContentPadding.PaddingRight = UDim.new(0, 5)
+        TabContentPadding.Parent = TabContent
+
+        StoredInfo.Tabs[Settings.Title] = { TabButton = TabButton, TabContent = TabContent }
+
+        TabButton.MouseButton1Click:Connect(function()
+            Options:SetTab(TabButton.Name)
+        end)
+
+        if #StoredInfo.Tabs == 1 then
+            Options:SetTab(Settings.Title)
+        end
+
+        return TabContent
+    end
+
+    function Options:AddTabIcon(TabName: string, DecalId: string)
+        if StoredInfo.Tabs[TabName] then
+            local TabButton = StoredInfo.Tabs[TabName].TabButton
+            local TabIcon = TabButton:FindFirstChild("TabIcon")
+            if TabIcon then
+                TabIcon.Image = DecalId
+            end
+        else
+            error("[UI LIB]: Tab " .. TabName .. " does not exist")
+        end
+    end
+
+    function Options:AddButton(Settings: { Title: string, Description: string }) 
+        local Paragraph = Instance.new("Frame")
+        Paragraph.Size = UDim2.new(0, 50, 0, 50) -- Circular size
+        Paragraph.BackgroundColor3 = Theme.Component
+        Paragraph.BackgroundTransparency = 0.75
+        Paragraph.Parent = Settings.Tab or MainHolder:GetChildren()[1]
+
+        local ParagraphCorner = Instance.new("UICorner")
+        ParagraphCorner.CornerRadius = UDim.new(0.5, 0) -- Makes it circular
+        ParagraphCorner.Parent = Paragraph
 
         local Labels = Instance.new("Frame")
         Labels.Name = "Labels"
-        Labels.Size = UDim2.new(1, 0, 1, 0)
+        Labels.Size = UDim2.new(1, -10, 1, -10)
+        Labels.Position = UDim2.new(0, 5, 0, 5)
         Labels.BackgroundTransparency = 1
-        Labels.Parent = Button
+        Labels.Parent = Paragraph
 
         local Title = Instance.new("TextLabel")
         Title.Name = "Title"
@@ -195,37 +352,41 @@ function Library:CreateWindow(Settings: { Title: string, Size: UDim2 })
         Title.BackgroundTransparency = 1
         Title.Text = Settings.Title
         Title.TextColor3 = Theme.Title
-        Title.TextSize = 16
+        Title.TextSize = 12 -- Reduced size for circular fit
         Title.Font = Enum.Font.SourceSansBold
-        Title.TextXAlignment = Enum.TextXAlignment.Left
+        Title.TextXAlignment = Enum.TextXAlignment.Center
         Title.Parent = Labels
 
         local Description = Instance.new("TextLabel")
         Description.Name = "Description"
-        Description.Size = UDim2.new(1, 0, 0, 20)
+        Description.Size = UDim2.new(1, 0, 0, 30)
         Description.Position = UDim2.new(0, 0, 0, 20)
         Description.BackgroundTransparency = 1
         Description.Text = Settings.Description
         Description.TextColor3 = Theme.Description
-        Description.TextSize = 14
+        Description.TextSize = 10 -- Reduced size for circular fit
         Description.Font = Enum.Font.SourceSans
-        Description.TextXAlignment = Enum.TextXAlignment.Left
+        Description.TextXAlignment = Enum.TextXAlignment.Center
         Description.TextWrapped = true
         Description.Parent = Labels
-
-        Connect(Button.MouseButton1Click, Settings.Callback)
     end
 
-    function Options:AddToggle(Settings: { Title: string, Description: string, Default: boolean, Callback: any }) 
+    function Options:AddToggle(Settings: { Title: string, Description: string, Default: boolean, Callback: any, Tab: Instance }) 
         local Toggle = Instance.new("TextButton")
-        Toggle.Size = UDim2.new(1, -10, 0, 50)
+        Toggle.Size = UDim2.new(0, 50, 0, 50) -- Circular size
         Toggle.BackgroundColor3 = Theme.Component
+        Toggle.BackgroundTransparency = 0.75
         Toggle.Text = ""
-        Toggle.Parent = Content
+        Toggle.Parent = Settings.Tab or MainHolder:GetChildren()[1]
+
+        local ToggleCorner = Instance.new("UICorner")
+        ToggleCorner.CornerRadius = UDim.new(0.5, 0) -- Makes it circular
+        ToggleCorner.Parent = Toggle
 
         local Labels = Instance.new("Frame")
         Labels.Name = "Labels"
-        Labels.Size = UDim2.new(1, -40, 1, 0)
+        Labels.Size = UDim2.new(1, -10, 1, -10)
+        Labels.Position = UDim2.new(0, 5, 0, 5)
         Labels.BackgroundTransparency = 1
         Labels.Parent = Toggle
 
@@ -235,21 +396,21 @@ function Library:CreateWindow(Settings: { Title: string, Size: UDim2 })
         Title.BackgroundTransparency = 1
         Title.Text = Settings.Title
         Title.TextColor3 = Theme.Title
-        Title.TextSize = 16
+        Title.TextSize = 12 -- Reduced size for circular fit
         Title.Font = Enum.Font.SourceSansBold
-        Title.TextXAlignment = Enum.TextXAlignment.Left
+        Title.TextXAlignment = Enum.TextXAlignment.Center
         Title.Parent = Labels
 
         local Description = Instance.new("TextLabel")
         Description.Name = "Description"
-        Description.Size = UDim2.new(1, 0, 0, 20)
+        Description.Size = UDim2.new(1, 0, 0, 30)
         Description.Position = UDim2.new(0, 0, 0, 20)
         Description.BackgroundTransparency = 1
         Description.Text = Settings.Description
         Description.TextColor3 = Theme.Description
-        Description.TextSize = 14
+        Description.TextSize = 10 -- Reduced size for circular fit
         Description.Font = Enum.Font.SourceSans
-        Description.TextXAlignment = Enum.TextXAlignment.Left
+        Description.TextXAlignment = Enum.TextXAlignment.Center
         Description.TextWrapped = true
         Description.Parent = Labels
 
@@ -261,7 +422,7 @@ function Library:CreateWindow(Settings: { Title: string, Size: UDim2 })
         local Main = Instance.new("Frame")
         Main.Name = "Main"
         Main.Size = UDim2.new(0, 30, 0, 14)
-        Main.Position = UDim2.new(1, -30, 0.5, -7)
+        Main.Position = UDim2.new(0.5, -15, 1, -19)
         Main.BackgroundTransparency = 1
         Main.Parent = Toggle
 
