@@ -11,7 +11,7 @@ end
 --// Important 
 local Setup = {
     Keybind = Enum.KeyCode.LeftControl,
-    Size = UDim2.new(0, 300, 0, 200),
+    Size = UDim2.new(0, 400, 0, 300),
 }
 
 local Theme = {
@@ -42,7 +42,7 @@ end
 
 --// Custom UI Setup
 local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "MinimalUI"
+ScreenGui.Name = "EnhancedUI"
 ScreenGui.Parent = game.CoreGui
 
 local Library = {}
@@ -57,13 +57,23 @@ function Library:CreateWindow(Settings: { Title: string, Size: UDim2 })
     Window.BorderSizePixel = 0
     Window.Parent = ScreenGui
 
-    -- Top Bar (Frame for control buttons)
+    -- Top Bar (Frame for control buttons and icon)
     local TopBar = Instance.new("Frame")
     TopBar.Name = "Top"
     TopBar.Size = UDim2.new(1, 0, 0, 30)
     TopBar.BackgroundColor3 = Theme.Secondary
     TopBar.BorderSizePixel = 0
     TopBar.Parent = Window
+
+    -- Icon (optional decal for window)
+    local Icon = Instance.new("ImageLabel")
+    Icon.Name = "Icon"
+    Icon.Size = UDim2.new(0, 20, 0, 20)
+    Icon.Position = UDim2.new(0, 5, 0.5, -10)
+    Icon.BackgroundTransparency = 1
+    Icon.Image = ""
+    Icon.ImageColor3 = Theme.Title
+    Icon.Parent = TopBar
 
     -- Buttons Frame (for control buttons)
     local ButtonsFrame = Instance.new("Frame")
@@ -80,13 +90,17 @@ function Library:CreateWindow(Settings: { Title: string, Size: UDim2 })
     ButtonsLayout.Padding = UDim.new(0, 5)
     ButtonsLayout.Parent = ButtonsFrame
 
-    -- Content Area (Frame for components)
-    local Content = Instance.new("Frame")
+    -- Content Area (ScrollingFrame for components)
+    local Content = Instance.new("ScrollingFrame")
     Content.Name = "Content"
     Content.Size = UDim2.new(1, 0, 1, -30)
     Content.Position = UDim2.new(0, 0, 0, 30)
     Content.BackgroundColor3 = Theme.Primary
     Content.BorderSizePixel = 0
+    Content.ScrollBarThickness = 5
+    Content.ScrollBarImageColor3 = Theme.Component
+    Content.CanvasSize = UDim2.new(0, 0, 0, 0)
+    Content.AutomaticCanvasSize = Enum.AutomaticSize.Y
     Content.Parent = Window
 
     local ContentLayout = Instance.new("UIListLayout")
@@ -248,30 +262,19 @@ function Library:CreateWindow(Settings: { Title: string, Size: UDim2 })
         Main.Name = "Main"
         Main.Size = UDim2.new(0, 30, 0, 14)
         Main.Position = UDim2.new(1, -30, 0.5, -7)
-        Main.BackgroundColor3 = Settings.Default and Color3.fromRGB(153, 155, 255) or Theme.Interactables
+        Main.BackgroundTransparency = 1
         Main.Parent = Toggle
 
-        local Circle = Instance.new("Frame")
-        Circle.Name = "Circle"
-        Circle.Size = UDim2.new(0, 10, 0, 10)
-        Circle.Position = UDim2.new(Settings.Default and 1 or 0, Settings.Default and -16 or 3, 0.5, 0)
-        Circle.BackgroundColor3 = Settings.Default and Color3.fromRGB(255, 255, 255) or Theme.Primary
-        Circle.Parent = Main
-
-        local Corner = Instance.new("UICorner")
-        Corner.CornerRadius = UDim.new(0, 5)
-        Corner.Parent = Circle
+        local ToggleImage = Instance.new("ImageLabel")
+        ToggleImage.Name = "ToggleImage"
+        ToggleImage.Size = UDim2.new(0, 30, 0, 14)
+        ToggleImage.Position = UDim2.new(0, 0, 0, 0)
+        ToggleImage.BackgroundTransparency = 1
+        ToggleImage.Image = Settings.Default and "rbxassetid://105620223191972" or "rbxassetid://105490232180240"
+        ToggleImage.Parent = Main
 
         local Set = function(Value)
-            if Value then
-                Main.BackgroundColor3 = Color3.fromRGB(153, 155, 255)
-                Circle.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-                Circle.Position = UDim2.new(1, -16, 0.5, 0)
-            else
-                Main.BackgroundColor3 = Theme.Interactables
-                Circle.BackgroundColor3 = Theme.Primary
-                Circle.Position = UDim2.new(0, 3, 0.5, 0)
-            end
+            ToggleImage.Image = Value and "rbxassetid://105620223191972" or "rbxassetid://105490232180240"
             On.Value = Value
         end 
 
@@ -282,6 +285,10 @@ function Library:CreateWindow(Settings: { Title: string, Size: UDim2 })
         end)
 
         Set(Settings.Default)
+    end
+
+    function Options:addIcon(DecalId: string)
+        Icon.Image = DecalId
     end
 
     return Options
